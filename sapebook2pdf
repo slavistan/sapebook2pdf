@@ -87,9 +87,10 @@ lsfonts() {
   fonts="$(cat "$tmpdir/"*.svg | grep -o 'font-family="[^"]*"' |
     cut -d '=' -f 2- | sed -e 's/^"'"'"'\?//g' -e 's/'"'"'\?"$//g' |
     sort | uniq)"
+  availfonts="$(fc-list :family)"
   echo "$fonts" | while read f; do
     printf " - $f "
-    if fc-list :family | grep -q "$f"; then
+    if echo "$availfonts" | grep -q "$f"; then
       printf "[\033[32mavailable\033[0m]\n"
     else
       fontmissing=1
@@ -126,6 +127,7 @@ genpdf() {
     printf "done.\n"
   else
     printf "error.\n"
+    return 1
   fi
 }
 
