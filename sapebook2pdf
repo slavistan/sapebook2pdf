@@ -23,7 +23,7 @@ Usage:
     Usage hints:
 
       To acquire a cookies.txt login to your account and navigate to the ebook.
-      Use you browser to generate the cookies.txt for you (which may require
+      Use your browser to generate the cookies.txt for you (which may require
       using a plugin).
 
       The baseurl corresponds to the path containing the index.html. Given
@@ -177,7 +177,6 @@ setup() {
     echo "Cannot create temporary directory."
     return 1
   fi
-  # TODO: Curl index.html and check connection right away
 }
 
 case "$1" in
@@ -203,6 +202,8 @@ case "$1" in
   ;;
 esac
 
-# TODO: LICENSE
-# TODO: Asciicast -> GIF
-# TODO: Usage in README.md
+# TODO: Make plain shell script
+#        - Remove zsh from requirements
+# TODO: Automatically determine pages
+#        - Remove page range parameter
+# TODO: Verify connection asap
