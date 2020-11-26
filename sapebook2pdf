@@ -23,7 +23,7 @@ Usage:
     Usage hints:
 
       To acquire a cookies.txt login to your account and navigate to the ebook.
-      Use you browser to generate the cookies.txt for you (which may require a
+      Use you browser to generate the cookies.txt for you (which may require
       using a plugin).
 
       The baseurl corresponds to the path containing the index.html. Given
@@ -31,12 +31,12 @@ Usage:
       baseurl is 'https://sap.com/foo/self-managed/ebook/BC100_EN_Col18/'.
 
       The ebooks are stored online as individual pages in SVG format. These
-      SVGs reference fonts which are required to be available on your system
-      in order for them to end up in the generated PDF. The availability of
-      the fonts is asserted during compilation with missing fonts having to be
-      installed manually on your system. You may choose to skip any font
-      checks via the option --nocheckfont which will lead to the usage of
-      your system's fallback fonts which may of may produce a goofy PDF.
+      SVGs reference fonts which are required to be available on your system in
+      order for them to end up in the generated PDF. The availability of the
+      fonts is asserted during compilation with missing fonts having to be
+      installed manually on your system. You may choose to skip any font checks
+      via the option --nocheckfont which will lead to the usage of your
+      system's fallback fonts and may or may not produce a goofy PDF.
 
 
 Examples:
@@ -44,7 +44,7 @@ Examples:
   $ZSH_ARGZERO \\
     --nocheckfont \\
     --baseurl="https://sap.com/foo/self-managed/ebook/BC100_EN_Col18" \\
-    --pages=40-80 \\
+    --pages=1-80 \\
     --cookies=./cookies.txt \\
     --pdfout=~/doc/ebook.pdf
 EOF
@@ -134,8 +134,10 @@ setup() {
   for arg in "$@"; do
     if echo "$arg" | grep -q '^--pdfout='; then
       pdfout="${arg:s/--pdfout=//}"
+      pdfout="$(echo "$pdfout" | sed 's|^~|'"$HOME"'|')"
     elif echo "$arg" | grep -q '^--cookies='; then
       cookies="${arg:s/--cookies=//}"
+      cookies="$(echo "$cookies" | sed 's|^~|'"$HOME"'|')"
     elif echo "$arg" | grep -q '^--baseurl='; then
       baseurl="${arg:s/--baseurl=//}"
     elif echo "$arg" | grep -q '^--pages='; then
@@ -165,15 +167,15 @@ setup() {
     echo "Cannot read cookies file '$cookies'."
     return 1
   fi
-  if [ ! -d "${pdfout:A:h}" ]; then
-    echo "Output directory '${pdfout:A:h}' does not exist."
+  if [ ! -d "${pdfout:h}" ]; then
+    echo "Output directory '${pdfout:h}' does not exist."
     return 1
   fi
   if ! tmpdir="$(mktemp -d)"; then
     echo "Cannot create temporary directory."
     return 1
   fi
-  # TODO: Curl index.html and check connection
+  # TODO: Curl index.html and check connection right away
 }
 
 case "$1" in
@@ -198,3 +200,7 @@ case "$1" in
   fi
   ;;
 esac
+
+# TODO: LICENSE
+# TODO: Asciicast -> GIF
+# TODO: Usage in README.md
