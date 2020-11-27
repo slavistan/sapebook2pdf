@@ -207,3 +207,4 @@ esac
 # TODO: Automatically determine pages
 #        - Remove page range parameter
 # TODO: Verify connection asap
+# TODO: Unfuck links (use javascript by default)
