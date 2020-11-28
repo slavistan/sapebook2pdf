@@ -1,47 +1,48 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env sh
 
+# Print usage
 usage() {
   cat <<EOF
 Generate a PDF from an SAP Learning Hub ebook. Their ebook reader is insulting.
 
 Usage:
 
-  $ZSH_ARGZERO [OPTIONS] SETTING=VALUE...
+  sapebook2pdf [OPTIONS] SETTING=VALUE...
 
     VALUEs must be provided for each of the following SETTINGs:
 
-      --baseurl - Path URL to the directory containing the ebook's index.html
-      --cookies - Path to local cookies.txt containing the login cookies
-      --pages   - Range of pages as two numbers separated by a hyphen
-      --pdfout  - Output path. Directory must exist.
+    --baseurl - Path URL to the directory containing the ebook's index.html
+    --cookies - Path to local cookies.txt containing the login cookies
+    --pages   - Range of pages as two numbers separated by a hyphen
+    --pdfout  - Output path. Directory must exist.
 
-    OPTIONS include:
+  OPTIONS include:
 
-      --nocheckfont - Don't check if all SVG fonts are availble on the system
-      --nocleanup   - Don't remove temporary files after finishing
+    --nocheckfont - Don't check if all SVG fonts are availble on the system
+    --nocleanup   - Don't remove temporary files after finishing
 
-    Usage hints:
+  Usage hints:
 
-      To acquire a cookies.txt login to your account and navigate to the ebook.
-      Use your browser to generate the cookies.txt for you (which may require
-      using a plugin).
+    To acquire a cookies.txt login to your account and navigate to the ebook.
+    Use your browser to generate the cookies.txt for you (which may require
+    using a plugin).
 
-      The baseurl corresponds to the path containing the index.html. Given
-      'https://sap.com/foo/self-managed/ebook/BC100_EN_Col18/index.html' the
-      baseurl is 'https://sap.com/foo/self-managed/ebook/BC100_EN_Col18/'.
+    The baseurl corresponds to the path containing the index.html. Given
+    'https://sap.com/foo/self-managed/ebook/BC100_EN_Col18/index.html' the
+    baseurl is 'https://sap.com/foo/self-managed/ebook/BC100_EN_Col18/'.
 
-      The ebooks are stored online as individual pages in SVG format. These
-      SVGs reference fonts which are required to be available on your system in
-      order for them to end up in the generated PDF. The availability of the
-      fonts is asserted during compilation with missing fonts having to be
-      installed manually on your system. You may choose to skip any font checks
-      via the option --nocheckfont which will lead to the usage of your
-      system's fallback fonts and may or may not produce a goofy PDF.
+    The ebooks are stored online as individual pages in SVG format. These
+    SVGs reference fonts which are required to be available on your system in
+    order for them to end up in the generated PDF. The availability of the
+    fonts is asserted during compilation with missing fonts having to be
+    installed manually on your system. You may choose to skip any font checks
+    via the option --nocheckfont which will lead to the usage of your
+    system's fallback fonts and may or may not produce a goofy PDF.
 
 
 Examples:
 
-  $ZSH_ARGZERO \\
+  sapebook2pdf \\
     --nocheckfont \\
     --baseurl="https://sap.com/foo/self-managed/ebook/BC100_EN_Col18" \\
     --pages=1-80 \\
@@ -50,156 +51,186 @@ Examples:
 EOF
 }
 
+# Remove temporary files
 cleanup() {
-  rm -r "$tmpdir"
+	rm -r "$tmpdir"
 }
 
 # Download all SVG files
 dlsvg() {
-  mkdir -p "$tmpdir"
-  total="$(echo "$pages" | wc -l)"
-  ii=1
-  echo "$pages" | while read page; do
-    printf "\033[2K\rDownloading SVGs ... $ii/$total"
-    ii=$((ii + 1))
-    reply="$(curl -Ls -b "$cookies" -c "$cookies" \
-      -w "\n%{http_code}" \
-      "$baseurl/xml/topic$page.svg")"
-    retcode=$(echo "$reply" | tail -n 1)
-    if [ ! "$retcode" -eq 200 ]; then
-      errorat="$errorat $page"
-    else
-      echo "$reply" | head -n -1 > "$tmpdir/page$page.svg"
-    fi
-  done
-    printf "\033[2K\rDownloading SVGs ... done.\n"
-  if [ ! -z "$errorat" ]; then
-    echo "$errorat" | while read page; do
-      echo "Error downloading page(s) '${errorat:s/ //}'" >&2
-    done
-    return 1
-  fi
+	ii=0
+	errorat=""
+	for pgnum in $pages; do
+		pageurl="$(echo "$pageurlt" | sed "s$pageurlt$pgnumg")"
+		svgpath="$(echo "$svgpatht" | sed "s$svgpatht$pgnumg")"
+		ii=$((ii + 1))
+
+		printf "\033[2K\rDownloading SVGs ... %d/%d" "$ii" "$numpgs"
+		reply="$(curl -Ls -b "$cks" -c "$cks" -w "\n%{http_code}" "$pageurl")"
+		retcode=$(echo "$reply" | tail -n 1)
+		if [ ! "$retcode" -eq 200 ]; then
+			errorat="${errorat:+$errorat, }$pgnum"
+		else
+			echo "$reply" | head -n -1 > "$svgpath"
+		fi
+	done
+	printf "\033[2K\rDownloading SVGs ... done.\n"
+
+	if [ -n "$errorat" ]; then
+		echo "Error downloading SVGs for page(s): $errorat" >&2
+		return 1
+	fi
 }
 
 # List all fonts required inside the SVGs
-lsfonts() {
-  printf "Required fonts:\n"
-  fonts="$(cat "$tmpdir/"*.svg | grep -o 'font-family="[^"]*"' |
-    cut -d '=' -f 2- | sed -e 's/^"'"'"'\?//g' -e 's/'"'"'\?"$//g' |
-    sort | uniq)"
-  availfonts="$(fc-list :family)"
-  echo "$fonts" | while read f; do
-    printf " - $f "
-    if echo "$availfonts" | grep -q "$f"; then
-      printf "[\033[32mavailable\033[0m]\n"
-    else
-      fontmissing=1
-      printf "[\033[31mnot available\033[0m]\n"
-    fi
-  done
-  return ${+fontmissing}
+checkfonts() {
+	# Assert that dir exists and is readable
+	tmpdir=""
+	if [ -z "$1" ] || ! tmpdir="$(realpath "$1")" ||
+		[ ! -d "$tmpdir" ] || [ ! -r "$tmpdir" ]; then
+		echo "Cannot access directory '$tmpdir'." >&2
+		return 1
+	fi
+
+	# Retrieve svg files in dir
+	svgs="$(find "$tmpdir" -maxdepth 1 -mindepth 1 -type f |
+		grep '/page[1-9][0-9]*\.svg$')"
+	if [ "$(printf "$svgs" | wc -l)" -eq 0 ]; then
+		echo "No files named 'page*.svg' found in '$tmpdir'." >&2
+		return 1
+	fi
+
+	# Retrieve required and available fonts
+	fontsreq="$(cat "$svgs" | grep -o 'font-family="[^"]*"' |
+		cut -d '=' -f 2- | sed -e 's/^"'"'"'\?//g' -e 's/'"'"'\?"$//g' |
+		sort | uniq)"
+	fontsavail="$(fc-list :family)"
+
+	# Compare required and available fonts
+	fontmissing=0
+	echo "Required fonts:"
+	while read f; do
+		printf " - $f "
+		if echo "$fontsavail" | grep -q "$f"; then
+			printf "[\033[32mavailable\033[0m]\n"
+		else
+			fontmissing=1
+			printf "[\033[31mnot available\033[0m]\n"
+		fi
+	done <<-EOF
+	$fontsreq
+	EOF
+	return "$fontmissing"
 }
 
 # Generate PDF
 genpdf() {
-  total="$(echo "$pages" | wc -l)"
-  ii=1
-  echo "$pages" | while read page; do
-    printf "\033[2K\rGenerating single PDF pages from SVGs ... $ii/$total"
-    ii=$((ii + 1))
-    inf="$tmpdir/page$page.svg"
-    outf="$tmpdir/page$page.pdf"
-    if ! rsvg-convert -f pdf -o "$outf" "$inf" 2>/dev/null; then
-      errorat="$errorat $page"
-    fi
-  done
-    printf "\033[2K\rGenerating single PDF pages from SVGs ... done.\n"
-  if [ ! -z "$errorat" ]; then
-    echo "$errorat" | while read page; do
-      echo "Error generating PDFs from SVG page(s) '${errorat:s/ //}'" >&2
-    done
-    return 1
-  fi
-  inpdfs="$(echo "$pages" | sed 's|.*|'"$tmpdir/"'page&.pdf|g')" # in order
-  mkdir -p "${pdfout:A:h}"
-  printf "Collating pages into single PDF '$pdfout' ... "
-  if pdftk "${=inpdfs:s/\n/ }" cat output "$pdfout"; then
-    printf "done.\n"
-  else
-    printf "error.\n"
-    return 1
-  fi
+	ii=0
+	errorat=""
+	for pgnum in $pages; do
+		svgpath="$(echo "$svgpatht" | sed "s$svgpatht$pgnumg")"
+		pdfpath="$(echo "$pdfpatht" | sed "s$pdfpatht$pgnumg")"
+		ii=$((ii + 1))
+
+		printf "\033[2K\rGenerating single PDF pages from SVGs ... $ii/$numpgs"
+		if ! rsvg-convert -f pdf -o "$pdfpath" "$svgpath" 2>/dev/null; then
+			errorat="${errorat:+$errorat, }$pgnum"
+		fi
+	done
+	printf "\033[2K\rGenerating single PDF pages from SVGs ... done.\n"
+
+	if [ -n "$errorat" ]; then
+		echo "Error downloading SVGs for page(s): $errorat" >&2
+		return 1
+	fi
+
+	# Generate pdf from individual pages; TODO: Move to separate function
+	# CONTINUEHERE: Remove zsh deps
+	inpdfs="$(echo "$pages" | sed 's|.*|'"$tmpdir/"'page&.pdf|g')" # in order
+	mkdir -p "${pdfout:A:h}"
+	printf "Collating pages into single PDF '$pdfout' ... "
+	if pdftk "${=inpdfs:s/\n/ }" cat output "$pdfout"; then
+		printf "done.\n"
+	else
+		printf "error.\n"
+		return 1
+	fi
 }
 
 # Parse args and initialize globals
 setup() {
-  for arg in "$@"; do
-    if echo "$arg" | grep -q '^--pdfout='; then
-      pdfout="${arg:s/--pdfout=//}"
-      pdfout="$(echo "$pdfout" | sed 's|^~|'"$HOME"'|')"
-    elif echo "$arg" | grep -q '^--cookies='; then
-      cookies="${arg:s/--cookies=//}"
-      cookies="$(echo "$cookies" | sed 's|^~|'"$HOME"'|')"
-    elif echo "$arg" | grep -q '^--baseurl='; then
-      baseurl="${arg:s/--baseurl=//}"
-    elif echo "$arg" | grep -q '^--pages='; then
-      range="${arg:s/--pages=//}"
-      if ! echo "$range" | grep -q '^[1-9]\+[0-9]*-[1-9]\+[0-9]*'; then
-        echo "Invalid page range." >&2
-        return 1
-      fi
-      n="$(echo "$range" | cut -d '-' -f1)"
-      m="$(echo "$range" | cut -d '-' -f2)"
-      if [ $n -gt $m ] || [ $m -le 0 ]; then
-        echo "Invalid page range." >&2
-        return 1
-      fi
-      pages="$(seq $n $m)"
-    elif [ "$arg" = "--nocheckfont" ]; then
-      nocheckfont=1
-    elif [ "$arg" = "--nocleanup" ]; then
-      nocleanup=1
-    else
-      echo "Unrecognized parameter '$arg'." >&2
-      return 1
-    fi
-  done
+	for arg in "$@"; do
+		if echo "$arg" | grep -q '^--pdfout='; then
+			pdfout="${arg:s/--pdfout=//}"
+			pdfout="$(echo "$pdfout" | sed 's|^~|'"$HOME"'|')"
+		elif echo "$arg" | grep -q '^--cookies='; then
+			cks="${arg:s/--cookies=//}"
+			cks="$(echo "$cks" | sed 's|^~|'"$HOME"'|')"
+		elif echo "$arg" | grep -q '^--baseurl='; then
+			baseurl="${arg:s/--baseurl=//}"
+		elif echo "$arg" | grep -q '^--pages='; then
+			range="${arg:s/--pages=//}"
+			if ! echo "$range" | grep -q '^[1-9]\+[0-9]*-[1-9]\+[0-9]*'; then
+				echo "Invalid page range." >&2
+				return 1
+			fi
+			n="$(echo "$range" | cut -d '-' -f1)"
+			m="$(echo "$range" | cut -d '-' -f2)"
+			if [ $n -gt $m ] || [ $m -le 0 ]; then
+				echo "Invalid page range." >&2
+				return 1
+			fi
+			pages="$(seq -s ' ' $n $m)"
+		elif [ "$arg" = "--nocheckfont" ]; then
+			nocheckfont=1
+		elif [ "$arg" = "--nocleanup" ]; then
+			nocleanup=1
+		else
+			echo "Unrecognized parameter '$arg'." >&2
+			return 1
+		fi
+	done
 
-  if [ ! -r "$cookies" ]; then
-    echo "Cannot read cookies file '$cookies'."
-    return 1
-  fi
-  if [ ! -d "${pdfout:h}" ]; then
-    echo "Output directory '${pdfout:h}' does not exist."
-    return 1
-  fi
-  if ! tmpdir="$(mktemp -d)"; then
-    echo "Cannot create temporary directory."
-    return 1
-  fi
+	if [ ! -r "$cks" ]; then
+		echo "Cannot read cookies file '$cks'."
+		return 1
+	fi
+	if [ ! -d "${pdfout:h}" ]; then
+		echo "Output directory '${pdfout:h}' does not exist."
+		return 1
+	fi
+	if ! tmpdir="$(mktemp -d)"; then
+		echo "Cannot create temporary directory."
+		return 1
+	fi
+
+	pageurlt="$baseurl/xml/topic%{pgnum}.svg" # remote page url template
+	svgpatht="$tmpdir/page%{pgnum}.svg" # local svg page path template
+	pdfpatht="$tmpdir/page%{pgnum}.pdf" # local pdf page path template
+	numpgs="$(echo "$pages" | wc -l)" # total number of pages
 }
 
 case "$1" in
 -h|--help)
-  usage
-  ;;
+	usage
+	;;
 @)
-  shift
-  "$@"
-  ;;
+	shift
+	"$@"
+	;;
 *)
-  set -e
-  setup "$@"
-  printf "Temporary files are saved to '$tmpdir'.\n"
-  dlsvg
-  if [ ! $nocheckfont ]; then
-    lsfonts
-  fi
-  genpdf
-  if [ ! $nocleanup ]; then
-    cleanup
-  fi
-  ;;
+	set -e
+	setup "$@"
+	printf "Temporary files are saved to '$tmpdir'.\n"
+	dlsvg
+	if [ ! $nocheckfont ]; then
+		checkfonts
+	fi
+	genpdf
+	if [ ! $nocleanup ]; then
+		cleanup
+	fi
+	;;
 esac
 
 # TODO: Make plain shell script
@@ -207,4 +238,5 @@ esac
 # TODO: Automatically determine pages
 #        - Remove page range parameter
 # TODO: Verify connection asap
-# TODO: Unfuck links (use javascript by default)
+# TODO: Unfuck links (SVGs use javascript "links" by default)
+# TODO: Parameterize tempdir to continue aborted generation
