@@ -82,7 +82,58 @@ dlsvg() {
 	fi
 }
 
-# List all fonts required inside the SVGs
+# Check connection
+checkconn() {
+
+	printf "Running connection check ...\n"
+
+	# Assert that cookiex.txt exists and is readable
+	printf "\033[2K\r - [ ] \033[3mcookies.txt\033[0m exists and is readable ... "
+	cookies=""
+	if [ -z "$1" ] || ! cookies="$(realpath "$1")" ||
+		[ ! -f "$cookies" ] || [ ! -r "$cookies" ]; then
+		printf "\033[2K\r - [\033[31;1m✗\033[0m] \033[3mcookies.txt\033[0m is readable ... fail. Abort.\n"
+		return 1
+	else
+		printf "\033[2K\r - [\033[32;1m✔\033[0m] \033[3mcookies.txt\033[0m is readable ... success.\n"
+	fi
+
+	# Assert that url is sane
+	printf "\033[2K\r - [ ] Baseurl is sane ... "
+	baseurl="$2"
+	if [ -z "$baseurl" ]; then
+		printf "\033[2K\r - [\033[31;1m✗\033[0m] Baseurl is sane ... fail. Abort.\n"
+		return 1
+	else
+		printf "\033[2K\r - [\033[32;1m✔\033[0m] Baseurl is sane ... success.\n"
+	fi
+
+	# Attempt to download index.html
+	ret=0
+	printf "\033[2K\r - [ ] Attempting to download \033[3mindex.html\033[0m ... "
+	retcode="$(curl -Ls -b "$cookies" -c "$cookies" -w "\n%{http_code}" \
+		"$baseurl/index.html" | tail -n -1)"
+	if [ "$retcode" -eq 200 ]; then
+		printf "\033[2K\r - [\033[32;1m✔\033[0m] Attempting to download \033[3mindex.html\033[0m ... success.\n"
+	else
+		printf "\033[2K\r - [\033[31;1m✗\033[0m] Attempting to download \033[3mindex.html\033[0m ... fail.\n"
+		ret=1
+	fi
+
+	# Attempt to download page 1
+	printf "\033[2K\r - [ ] Attempting to download \033[3m✔xml/topic1.svg\033[0m ... "
+	retcode="$(curl -Ls -b "$cookies" -c "$cookies" -w "\n%{http_code}" \
+		"$baseurl/xml/topic1.svg" | tail -n -1)"
+	if [ "$retcode" -eq 200 ]; then
+		printf "\033[2K\r - [\033[32;1m✔\033[0m] Attempting to download \033[3mxml/topic1.svg\033[0m ... success.\n"
+	else
+		printf "\033[2K\r - [\033[31;1m✗\033[0m] Attempting to download \033[3mxml/topic1.svg\033[0m ... fail.\n"
+		ret=1
+	fi
+	return "$ret"
+}
+
+# Check availability of required fonts
 checkfonts() {
 	# Assert that dir exists and is readable
 	tmpdir=""
