@@ -143,7 +143,7 @@ checkconn() {
 	fi
 
 	# Attempt to download first page
-	printf "\033[2K\r - [ ] Attempting to download \033[3m✔xml/topic1.svg\033[0m ... "
+	printf "\033[2K\r - [ ] Attempting to download \033[3mxml/topic1.svg\033[0m ... "
 	retcode="$(curl -Ls -b "$cookies" -c "$cookies" -w "\n%{http_code}" \
 		"$baseurl/xml/topic1.svg" | tail -n -1)"
 	if [ "$retcode" -eq 200 ]; then
