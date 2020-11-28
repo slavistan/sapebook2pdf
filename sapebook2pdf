@@ -58,6 +58,22 @@ cleanup() {
 
 # Download all SVG files
 dlsvg() {
+	cookies="$1"
+	baseurl="$2"
+	outdir="$3"
+	
+	# Check connection
+	printf "\033[2K\r - [ ] Checking connection ... "
+	if checkconn "$1" "$2" >/dev/null; then
+		printf "\033[2K\r - [\033[32;1m✔\033[0m] Checking connection ... success.\n"
+	else
+		printf "\033[2K\r - [\033[31;1m✗\033[0m] Checking connection ... fail. Abort.\n"
+		return 1
+	fi
+	return 3
+
+	# CONTINUEHERE: Check that outdir exists
+
 	ii=0
 	errorat=""
 	for pgnum in $pages; do
@@ -84,7 +100,6 @@ dlsvg() {
 
 # Check connection
 checkconn() {
-
 	printf "Running connection check ...\n"
 
 	# Assert that cookiex.txt exists and is readable
