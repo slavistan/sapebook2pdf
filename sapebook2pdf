@@ -61,7 +61,7 @@ dlsvg() {
 	cookies="$1"
 	baseurl="$2"
 	outdir="$3"
-	
+
 	# Check connection
 	printf "\033[2K\r - [ ] Checking connection ... "
 	if checkconn "$1" "$2" >/dev/null; then
@@ -70,10 +70,17 @@ dlsvg() {
 		printf "\033[2K\r - [\033[31;1m✗\033[0m] Checking connection ... fail. Abort.\n"
 		return 1
 	fi
-	return 3
 
-	# CONTINUEHERE: Check that outdir exists
+	# Check output directory
+	if [ -d "$outdir" ] && [ -w "$outdir" ] &&
+		outdir="$(realpath "$outdir")"; then
+		printf " - [\033[32;1m✔\033[0m] Output directory is accessible ... success.\n"
+	else
+		printf " - [\033[31;1m✗\033[0m] Output directory is accessible ... fail. Abort.\n"
+		return 1
+	fi
 
+	# CONTINUEHERE
 	ii=0
 	errorat=""
 	for pgnum in $pages; do
@@ -100,7 +107,7 @@ dlsvg() {
 
 # Check connection
 checkconn() {
-	printf "Running connection check ...\n"
+	printf "Checking connection ...\n"
 
 	# Assert that cookiex.txt exists and is readable
 	printf "\033[2K\r - [ ] \033[3mcookies.txt\033[0m exists and is readable ... "
@@ -135,7 +142,7 @@ checkconn() {
 		ret=1
 	fi
 
-	# Attempt to download page 1
+	# Attempt to download first page
 	printf "\033[2K\r - [ ] Attempting to download \033[3m✔xml/topic1.svg\033[0m ... "
 	retcode="$(curl -Ls -b "$cookies" -c "$cookies" -w "\n%{http_code}" \
 		"$baseurl/xml/topic1.svg" | tail -n -1)"
@@ -211,7 +218,6 @@ genpdf() {
 	fi
 
 	# Generate pdf from individual pages; TODO: Move to separate function
-	# CONTINUEHERE: Remove zsh deps
 	inpdfs="$(echo "$pages" | sed 's|.*|'"$tmpdir/"'page&.pdf|g')" # in order
 	mkdir -p "${pdfout:A:h}"
 	printf "Collating pages into single PDF '$pdfout' ... "
