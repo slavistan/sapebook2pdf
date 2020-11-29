@@ -58,16 +58,16 @@ cleanup() {
 
 # Download all SVG files
 dlsvg() {
-	cookies="$1"
-	baseurl="$2"
-	outdir="$3"
+	cookies="$1" # path to cookies.txt
+	baseurl="$2" # head of url to index.html
+	outdir="$3" # directory to dl svg files to
+	pages="$4" # pages to download as csv
 
-	# Check connection
-	printf "\033[2K\r - [ ] Checking connection ... "
-	if checkconn "$1" "$2" >/dev/null; then
-		printf "\033[2K\r - [\033[32;1m✔\033[0m] Checking connection ... success.\n"
+	# Check pages
+	if echo "$pages" | grep -q '^[1-9][0-9]*\(,[1-9][0-9]*\)*$'; then
+		printf " - [\033[32;1m✔\033[0m] Pages are comma-sep'd list ... success.\n"
 	else
-		printf "\033[2K\r - [\033[31;1m✗\033[0m] Checking connection ... fail. Abort.\n"
+		printf " - [\033[31;1m✗\033[0m] Pages are comma-sep'd list ... fail. Abort.\n"
 		return 1
 	fi
 
@@ -80,27 +80,41 @@ dlsvg() {
 		return 1
 	fi
 
-	# CONTINUEHERE
+	# Check connection
+	printf "\033[2K\r - [ ] Checking connection ... "
+	if checkconn "$1" "$2" >/dev/null; then
+		printf "\033[2K\r - [\033[32;1m✔\033[0m] Checking connection ... success.\n"
+	else
+		printf "\033[2K\r - [\033[31;1m✗\033[0m] Checking connection ... fail. Abort.\n"
+		return 1
+	fi
+
+	# Download svg files
 	ii=0
-	errorat=""
-	for pgnum in $pages; do
-		pageurl="$(echo "$pageurlt" | sed "s$pageurlt$pgnumg")"
-		svgpath="$(echo "$svgpatht" | sed "s$svgpatht$pgnumg")"
+	numpgs="$(( 1 + $(echo "$pages" | tr -cd ',' | wc -c) ))"
+	errpgs="" # pgnums whose dl failed; csv
+	printf "\033[2K\r - [ ] Downloading SVGs ... "
+	for pgnum in $(echo "$pages" | tr ',' ' '); do
+		pageurl="$baseurl/xml/topic${pgnum}.svg"
+		svgpath="$outdir/page${pgnum}.svg"
 		ii=$((ii + 1))
 
-		printf "\033[2K\rDownloading SVGs ... %d/%d" "$ii" "$numpgs"
-		reply="$(curl -Ls -b "$cks" -c "$cks" -w "\n%{http_code}" "$pageurl")"
-		retcode=$(echo "$reply" | tail -n 1)
-		if [ ! "$retcode" -eq 200 ]; then
-			errorat="${errorat:+$errorat, }$pgnum"
+		printf "\033[2K\r - [ ] Downloading SVGs ... %d/%d" "$ii" "$numpgs"
+		reply="$(curl -Ls -b "$cookies" -c "$cookies" -w "\n%{http_code}" "$pageurl")"
+		retcode="$(echo "$reply" | tail -n 1)"
+		svg="$(echo "$reply" | head -n -1)"
+
+		if [ -z "$svg" ] || [ ! "$retcode" -eq 200 ]; then
+			errpgs="${errpgs:+$errpgs,}$pgnum"
 		else
-			echo "$reply" | head -n -1 > "$svgpath"
+			echo "$svg" > "$svgpath"
 		fi
 	done
-	printf "\033[2K\rDownloading SVGs ... done.\n"
-
-	if [ -n "$errorat" ]; then
-		echo "Error downloading SVGs for page(s): $errorat" >&2
+	if [ -z "$errpgs" ]; then
+		printf "\033[2K\r - [\033[32;1m✔\033[0m] Downloading SVGs ... success.\n"
+	else
+		printf "\033[2K\r - [\033[31;1m✗\033[0m] Downloading SVGs ... failed for page(s):\n"
+		printf "        %s\n" "$errpgs"
 		return 1
 	fi
 }
@@ -157,63 +171,74 @@ checkconn() {
 
 # Check availability of required fonts
 checkfonts() {
-	# Assert that dir exists and is readable
-	tmpdir=""
-	if [ -z "$1" ] || ! tmpdir="$(realpath "$1")" ||
-		[ ! -d "$tmpdir" ] || [ ! -r "$tmpdir" ]; then
-		echo "Cannot access directory '$tmpdir'." >&2
+	indir="$1"
+	outdir="$2"
+
+	# Check input directory
+	if [ -d "$indir" ] && [ -w "$indir" ] &&
+		indir="$(realpath "$indir")"; then
+		printf " - [\033[32;1m✔\033[0m] Input directory is accessible ... success.\n"
+	else
+		printf " - [\033[31;1m✗\033[0m] Input directory is accessible ... fail. Abort.\n"
+		return 1
+	fi
+
+	# Check output directory
+	if [ -d "$outdir" ] && [ -w "$outdir" ] &&
+		outdir="$(realpath "$outdir")"; then
+		printf " - [\033[32;1m✔\033[0m] Output directory is accessible ... success.\n"
+	else
+		printf " - [\033[31;1m✗\033[0m] Output directory is accessible ... fail. Abort.\n"
 		return 1
 	fi
 
 	# Retrieve svg files in dir
-	svgs="$(find "$tmpdir" -maxdepth 1 -mindepth 1 -type f |
-		grep '/page[1-9][0-9]*\.svg$')"
-	if [ "$(printf "$svgs" | wc -l)" -eq 0 ]; then
-		echo "No files named 'page*.svg' found in '$tmpdir'." >&2
+	if svgs="$(find "$indir" -maxdepth 1 -mindepth 1 -type f |
+		grep '/page[1-9][0-9]*\.svg$')"; then
+		numsvgs="$(echo "$svgs" | wc -l)"
+		printf " - [\033[32;1m✔\033[0m] Found %d SVG files ... success.\n" "$numsvgs"
+	else
+		printf " - [\033[31;1m✗\033[0m] No SVG files found ... fail. Abort.\n"
 		return 1
 	fi
 
-	# Retrieve required and available fonts
-	fontsreq="$(cat "$svgs" | grep -o 'font-family="[^"]*"' |
+	# Retrieve required and available fonts and compare
+	fontsmissing=0
+	fontsreq="$(echo "$svgs" | xargs cat | grep -o 'font-family="[^"]*"' |
 		cut -d '=' -f 2- | sed -e 's/^"'"'"'\?//g' -e 's/'"'"'\?"$//g' |
 		sort | uniq)"
 	fontsavail="$(fc-list :family)"
-
-	# Compare required and available fonts
-	fontmissing=0
-	echo "Required fonts:"
 	while read f; do
-		printf " - $f "
 		if echo "$fontsavail" | grep -q "$f"; then
-			printf "[\033[32mavailable\033[0m]\n"
+			printf " - [\033[32;1m✔\033[0m] Font '%s' available.\n" "$f"
 		else
-			fontmissing=1
-			printf "[\033[31mnot available\033[0m]\n"
+			printf " - [\033[31;1m✗\033[0m] Font '%s' not available.\n" "$f"
+			fontsmissing=1
 		fi
 	done <<-EOF
 	$fontsreq
 	EOF
-	return "$fontmissing"
+	return "$fontsmissing"
 }
 
 # Generate PDF
 genpdf() {
 	ii=0
-	errorat=""
-	for pgnum in $pages; do
+	errpgs=""
+	for pgnum in "$(echo "$pages" | tr ',' ' ')"; do
 		svgpath="$(echo "$svgpatht" | sed "s$svgpatht$pgnumg")"
 		pdfpath="$(echo "$pdfpatht" | sed "s$pdfpatht$pgnumg")"
 		ii=$((ii + 1))
 
 		printf "\033[2K\rGenerating single PDF pages from SVGs ... $ii/$numpgs"
 		if ! rsvg-convert -f pdf -o "$pdfpath" "$svgpath" 2>/dev/null; then
-			errorat="${errorat:+$errorat, }$pgnum"
+			errpgs="${errpgs:+$errpgs, }$pgnum"
 		fi
 	done
 	printf "\033[2K\rGenerating single PDF pages from SVGs ... done.\n"
 
-	if [ -n "$errorat" ]; then
-		echo "Error downloading SVGs for page(s): $errorat" >&2
+	if [ -n "$errpgs" ]; then
+		echo "Error downloading SVGs for page(s): $errpgs" >&2
 		return 1
 	fi
 
