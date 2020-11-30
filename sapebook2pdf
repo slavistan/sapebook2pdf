@@ -7,47 +7,52 @@ Generate a PDF from an SAP Learning Hub ebook. Their ebook reader is insulting.
 
 Usage:
 
-  sapebook2pdf [OPTIONS] SETTING=VALUE...
+  sapebook2pdf COOKIESFILE BASEURL SVGDIR PAGES PDFDIR OUTFILE
 
-    VALUEs must be provided for each of the following SETTINGs:
+      COOKIESFILE is the path to the 'cookies.txt' containing cookies to allow
+      access to the ebook's remote files. To acquire a cookies.txt login to
+      your account and open the ebook. Use your browser to generate the
+      cookies.txt for you (which may require using a plugin).
 
-    --baseurl - Path URL to the directory containing the ebook's index.html
-    --cookies - Path to local cookies.txt containing the login cookies
-    --pages   - Range of pages as two numbers separated by a hyphen
-    --pdfout  - Output path. Directory must exist.
+      BASEURL corresponds to the path containing the ebook's index.html. Given
+      'https://sap.com/foo/self-managed/ebook/BC100_EN_Col18/index.html' the
+      baseurl is 'https://sap.com/foo/self-managed/ebook/BC100_EN_Col18/'.
 
-  OPTIONS include:
+      SVGDIR is a temporary directory used to store the ebook's individual
+      pages as SVGs files. Directory must exist.
 
-    --nocheckfont - Don't check if all SVG fonts are availble on the system
-    --nocleanup   - Don't remove temporary files after finishing
+      PAGES shall be a comma-separated list of individual page numbers to
+      include in the final PDF. Pages will be generated in order.
 
-  Usage hints:
+      PDFDIR is a temporary directory used to store the ebook's individual
+      pages as PDFs files generated from the SVGs. Directory must exist and may
+      be the same as SVGDIR.
 
-    To acquire a cookies.txt login to your account and navigate to the ebook.
-    Use your browser to generate the cookies.txt for you (which may require
-    using a plugin).
+      OUTFILE shall be the path of the final PDF. The base directory must
+      exist.
 
-    The baseurl corresponds to the path containing the index.html. Given
-    'https://sap.com/foo/self-managed/ebook/BC100_EN_Col18/index.html' the
-    baseurl is 'https://sap.com/foo/self-managed/ebook/BC100_EN_Col18/'.
-
-    The ebooks are stored online as individual pages in SVG format. These
-    SVGs reference fonts which are required to be available on your system in
-    order for them to end up in the generated PDF. The availability of the
-    fonts is asserted during compilation with missing fonts having to be
-    installed manually on your system. You may choose to skip any font checks
-    via the option --nocheckfont which will lead to the usage of your
-    system's fallback fonts and may or may not produce a goofy PDF.
+      The ebooks are stored online as individual pages in SVG format. These
+      SVGs reference fonts which are required to be available on your system in
+      order for them to end up in the generated PDF. The availability of the
+      fonts is checked during compilation with missing fonts having to be
+      installed manually on your system. Missing fonts will lead to the usage
+      of your system's fallback fonts and may or may not produce a goofy PDF.
+      You will be notified about any missing fonts.
 
 
-Examples:
+    Exemplary usage:
 
-  sapebook2pdf \\
-    --nocheckfont \\
-    --baseurl="https://sap.com/foo/self-managed/ebook/BC100_EN_Col18" \\
-    --pages=1-80 \\
-    --cookies=./cookies.txt \\
-    --pdfout=~/doc/ebook.pdf
+      sapebook2pdf                                                          \\
+        ./cookies.txt                                                       \\
+        "https://saplearninghub.com/sap/self-managed/ebook/BC100_EN_Col18/" \\
+        /tmp/ebook                                                          \\
+        "\$(seq -s ',' 1 100)"                                               \\
+        /tmp/ebook                                                          \\
+        /tmp/ebook/ebook.pdf
+
+      This will download pages 1-100 from the ebook and compile them to a PDF
+      saved to /tmp/ebook/ebook.pdf. Note that /tmp/ebook and ./cookies.txt
+      must exist.
 EOF
 }
 
@@ -79,7 +84,7 @@ dlsvgs() {
 
 	# Check connection
 	printf "\033[2K\r - [ ] Checking connection ... "
-	if checkconn "$1" "$2" >/dev/null; then
+	if checkconn "$cookies" "$baseurl" >/dev/null; then
 		printf "\033[2K\r - [\033[32;1m✔\033[0m] Checking connection ... success.\n"
 	else
 		printf "\033[2K\r - [\033[31;1m✗\033[0m] Checking connection ... fail. Abort.\n"
@@ -367,7 +372,6 @@ setup() {
 
 case "$1" in
 -h|--help)
-
 	usage
 	;;
 @)
@@ -382,12 +386,17 @@ case "$1" in
 	pdfdir="$5"
 	outfile="$6"
 
-	dlsvgs "$cookies" "$baseurl" "$svgdir" "$pages" &&
+	if dlsvgs "$cookies" "$baseurl" "$svgdir" "$pages"; then
 		checkfonts "$svgdir"
-	genpdfs "$svgdir" "$pdfdir" &&
+	else
+		return 1
+	fi
+	if genpdfs "$svgdir" "$pdfdir"; then
 		collatepdfs "$pdfdir" "$outfile"
+	fi
 esac
 
 # TODO: Automatically determine pages
 #        - Remove page range parameter
 # TODO: Unfuck links (SVGs use javascript "links" by default)
+# TODO: New usage gif

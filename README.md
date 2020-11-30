@@ -1,12 +1,9 @@
 **Generate a PDF from an SAP Learning Hub Ebook**
 
-For usage instructions see `./sapebook2pdf --help`.
+For usage instructions see `sapebook2pdf --help`.
 
-![](demo.gif)
-
-### Dependencies
+### Dependencies (sufficient)
 
  + GNU/Linux
- + `zsh`
- + `rsvg-convert`
- + `pdftk`
+ + `inkscape` ≥ v1.0.1
+ + `pdftk` ≥ v3.0.9
