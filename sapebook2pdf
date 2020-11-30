@@ -51,17 +51,14 @@ Examples:
 EOF
 }
 
-# Remove temporary files
-cleanup() {
-	rm -r "$tmpdir"
-}
-
 # Download all SVG files
-dlsvg() {
+dlsvgs() {
 	cookies="$1" # path to cookies.txt
 	baseurl="$2" # head of url to index.html
 	outdir="$3" # directory to dl svg files to
 	pages="$4" # pages to download as csv
+
+	echo "Downloading SVG files [dlsvg]"
 
 	# Check pages
 	if echo "$pages" | grep -q '^[1-9][0-9]*\(,[1-9][0-9]*\)*$'; then
@@ -121,7 +118,7 @@ dlsvg() {
 
 # Check connection
 checkconn() {
-	printf "Checking connection ...\n"
+	echo "Checking connection [checkconn]"
 
 	# Assert that cookiex.txt exists and is readable
 	printf "\033[2K\r - [ ] \033[3mcookies.txt\033[0m exists and is readable ... "
@@ -169,31 +166,23 @@ checkconn() {
 	return "$ret"
 }
 
-# Check availability of required fonts
+# Check availability of fonts required by SVG files
 checkfonts() {
-	indir="$1"
-	outdir="$2"
+	svgdir="$1"
+
+	echo "Checking fonts [checkfonts]"
 
 	# Check input directory
-	if [ -d "$indir" ] && [ -w "$indir" ] &&
-		indir="$(realpath "$indir")"; then
+	if [ -d "$svgdir" ] && [ -w "$svgdir" ] &&
+		svgdir="$(realpath "$svgdir")"; then
 		printf " - [\033[32;1m✔\033[0m] Input directory is accessible ... success.\n"
 	else
 		printf " - [\033[31;1m✗\033[0m] Input directory is accessible ... fail. Abort.\n"
 		return 1
 	fi
 
-	# Check output directory
-	if [ -d "$outdir" ] && [ -w "$outdir" ] &&
-		outdir="$(realpath "$outdir")"; then
-		printf " - [\033[32;1m✔\033[0m] Output directory is accessible ... success.\n"
-	else
-		printf " - [\033[31;1m✗\033[0m] Output directory is accessible ... fail. Abort.\n"
-		return 1
-	fi
-
 	# Retrieve svg files in dir
-	if svgs="$(find "$indir" -maxdepth 1 -mindepth 1 -type f |
+	if svgs="$(find "$svgdir" -maxdepth 1 -mindepth 1 -type f |
 		grep '/page[1-9][0-9]*\.svg$')"; then
 		numsvgs="$(echo "$svgs" | wc -l)"
 		printf " - [\033[32;1m✔\033[0m] Found %d SVG files ... success.\n" "$numsvgs"
@@ -221,35 +210,104 @@ checkfonts() {
 	return "$fontsmissing"
 }
 
-# Generate PDF
-genpdf() {
-	ii=0
-	errpgs=""
-	for pgnum in "$(echo "$pages" | tr ',' ' ')"; do
-		svgpath="$(echo "$svgpatht" | sed "s$svgpatht$pgnumg")"
-		pdfpath="$(echo "$pdfpatht" | sed "s$pdfpatht$pgnumg")"
-		ii=$((ii + 1))
+# Generate PDF pages from SVG files
+genpdfs() {
+	svgdir="$1" # input directory containing page%d.svg files
+	pdfdir="$2" # output directory for page%d.pdf files
 
-		printf "\033[2K\rGenerating single PDF pages from SVGs ... $ii/$numpgs"
-		if ! rsvg-convert -f pdf -o "$pdfpath" "$svgpath" 2>/dev/null; then
-			errpgs="${errpgs:+$errpgs, }$pgnum"
-		fi
-	done
-	printf "\033[2K\rGenerating single PDF pages from SVGs ... done.\n"
+	echo "Generating PDF pages [genpdfs]"
 
-	if [ -n "$errpgs" ]; then
-		echo "Error downloading SVGs for page(s): $errpgs" >&2
+	# Check input directory
+	if [ -d "$svgdir" ] && [ -w "$svgdir" ] &&
+		svgdir="$(realpath "$svgdir")"; then
+		printf " - [\033[32;1m✔\033[0m] Input directory is accessible ... success.\n"
+	else
+		printf " - [\033[31;1m✗\033[0m] Input directory is accessible ... fail. Abort.\n"
 		return 1
 	fi
 
-	# Generate pdf from individual pages; TODO: Move to separate function
-	inpdfs="$(echo "$pages" | sed 's|.*|'"$tmpdir/"'page&.pdf|g')" # in order
-	mkdir -p "${pdfout:A:h}"
-	printf "Collating pages into single PDF '$pdfout' ... "
-	if pdftk "${=inpdfs:s/\n/ }" cat output "$pdfout"; then
-		printf "done.\n"
+	# Check output directory
+	if [ -d "$pdfdir" ] && [ -w "$pdfdir" ] &&
+		pdfdir="$(realpath "$pdfdir")"; then
+		printf " - [\033[32;1m✔\033[0m] Output directory is accessible ... success.\n"
 	else
-		printf "error.\n"
+		printf " - [\033[31;1m✗\033[0m] Output directory is accessible ... fail. Abort.\n"
+		return 1
+	fi
+
+	# Retrieve svg files in dir
+	if svgs="$(find "$svgdir" -maxdepth 1 -mindepth 1 -type f |
+		grep '/page[1-9][0-9]*\.svg$')"; then
+		numsvgs="$(echo "$svgs" | wc -l)"
+		printf " - [\033[32;1m✔\033[0m] Found %d SVG file(s) ... success.\n" "$numsvgs"
+	else
+		printf " - [\033[31;1m✗\033[0m] No SVG files found ... fail. Abort.\n"
+		return 1
+	fi
+
+	ii=0
+	errpgs=""
+	while read svgfile; do
+		pdffile="$pdfdir/$(basename -s '.svg' "$svgfile").pdf"
+		ii=$((ii + 1))
+
+		printf "\033[2K\r - [ ] Generating PDF pages from SVGs ... %d/%d" "$ii" "$numpgs"
+		if ! cat "$svgfile" | inkscape --pipe --export-filename="$pdffile" 2>/dev/null; then
+		errpgs="${errpgs:+$errpgs, }$svgfile"
+		fi
+	done <<-EOF
+	$svgs
+	EOF
+	if [ -z "$errpgs" ]; then
+		printf "\033[2K\r - [\033[32;1m✔\033[0m] Generating PDF pages from SVGs ... success.\n"
+	else
+		printf "\033[2K\r - [\033[31;1m✗\033[0m] Generating PDF pages from SVGs  ... failed for page(s):\n"
+		printf "        %s\n" "$errpgs"
+		return 1
+	fi
+}
+
+collatepdfs() {
+	pdfdir="$1" # input directory containing page%d.png files
+	outfile="$2" # output file path for final pdf
+
+	# Check input directory
+	if [ -d "$pdfdir" ] && [ -w "$pdfdir" ] &&
+		pdfdir="$(realpath "$pdfdir")"; then
+		printf " - [\033[32;1m✔\033[0m] Input directory is accessible ... success.\n"
+	else
+		printf " - [\033[31;1m✗\033[0m] Input directory is accessible ... fail. Abort.\n"
+		return 1
+	fi
+
+	# Check output path
+	outdir="" # dir containing outfile
+	if [ -n "$outfile" ] && outfile="$(realpath "$outfile")" &&
+		outdir="$(dirname "$outdir")" && [ -d "$outdir" ] &&
+		[ -w "$outdir" ]; then
+		printf " - [\033[32;1m✔\033[0m] Output path is accessible ... success.\n"
+	else
+		printf " - [\033[31;1m✗\033[0m] Output path is accessible ... fail. Abort.\n"
+		return 1
+	fi
+	
+	# Retrieve pdf files in dir (in order)
+	if pdfs="$(find "$pdfdir" -maxdepth 1 -mindepth 1 -type f |
+		grep '/page[1-9][0-9]*\.pdf$' | sort -V)"; then
+		numpdfs="$(echo "$pdfs" | wc -l)"
+		printf " - [\033[32;1m✔\033[0m] Found %d PDF file(s) ... success.\n" "$numpdfs"
+	else
+		printf " - [\033[31;1m✗\033[0m] No PDF files found ... fail. Abort.\n"
+		return 1
+	fi
+
+	# Generate pdf from individual pages
+	printf " - [ ] Generating PDF ..."
+	if echo "$pdfs" | tr '\n' '\0' |
+		xargs -0 sh -c 'pdftk "$@" cat output '"$outfile" "$0" 2>/dev/null; then
+		printf "\033[2K\r - [\033[32;1m✔\033[0m] Generating PDF ... success.\n"
+	else
+		printf "\033[2K\r - [\033[31;1m✗\033[0m] Generating PDF ... fail. Abort.\n"
 		return 1
 	fi
 }
@@ -309,6 +367,7 @@ setup() {
 
 case "$1" in
 -h|--help)
+
 	usage
 	;;
 @)
@@ -316,24 +375,19 @@ case "$1" in
 	"$@"
 	;;
 *)
-	set -e
-	setup "$@"
-	printf "Temporary files are saved to '$tmpdir'.\n"
-	dlsvg
-	if [ ! $nocheckfont ]; then
-		checkfonts
-	fi
-	genpdf
-	if [ ! $nocleanup ]; then
-		cleanup
-	fi
-	;;
+	cookies="$1"
+	baseurl="$2"
+	svgdir="$3"
+	pages="$4"
+	pdfdir="$5"
+	outfile="$6"
+
+	dlsvgs "$cookies" "$baseurl" "$svgdir" "$pages" &&
+		checkfonts "$svgdir"
+	genpdfs "$svgdir" "$pdfdir" &&
+		collatepdfs "$pdfdir" "$outfile"
 esac
 
-# TODO: Make plain shell script
-#        - Remove zsh from requirements
 # TODO: Automatically determine pages
 #        - Remove page range parameter
-# TODO: Verify connection asap
 # TODO: Unfuck links (SVGs use javascript "links" by default)
-# TODO: Parameterize tempdir to continue aborted generation
