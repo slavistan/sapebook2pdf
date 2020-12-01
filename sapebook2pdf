@@ -350,4 +350,3 @@ esac
 # TODO: Automatically determine pages
 #        - Remove page range parameter
 # TODO: Unfuck links (SVGs use javascript "links" by default)
-# TODO: New usage gif
