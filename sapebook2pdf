@@ -76,9 +76,9 @@ dlsvgs() {
 	# Check output directory
 	if [ -d "$outdir" ] && [ -w "$outdir" ] &&
 		outdir="$(realpath "$outdir")"; then
-		printf " - [\033[32;1m✔\033[0m] Output directory is accessible ... success.\n"
+		printf " - [\033[32;1m✔\033[0m] Output directory '%s' is accessible ... success.\n" "$outdir"
 	else
-		printf " - [\033[31;1m✗\033[0m] Output directory is accessible ... fail. Abort.\n"
+		printf " - [\033[31;1m✗\033[0m] Output directory '%s' is accessible ... fail. Abort.\n" "$outdir"
 		return 1
 	fi
 

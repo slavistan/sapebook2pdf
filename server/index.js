@@ -2,6 +2,7 @@ const child_process = require("child_process")
 const express = require("express")
 const fs = require("fs")
 const multer = require("multer")
+const os = require("os")
 const path = require("path")
 const rimraf = require("rimraf")
 const serveStatic = require("serve-static")
@@ -30,27 +31,26 @@ async function execScript(req, res) {
     const file = req.file
     const pages = parsePages(req.body.pages.toString())
     const url = req.body.baseUrl
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sapebook2pdf-tmp-')) /* will be deleted */
+    const cookieFilePath = path.join(tmpDir, "cookies.txt")
+    const pdfOutPath = path.join("pdfs", Math.random().toString(36).substring(7) + ".pdf")
 
-    const folder = fs.mkdtempSync("out/")
-
-    const cookieFilePath = path.join(folder, "cookies.txt")
     fs.writeFileSync(cookieFilePath, file.buffer)
-    const filePath = path.join("pdfs", Math.random().toString(36).substring(7) + ".pdf")
 
-    res.header("Cache-Control", "no-cache")
-    res.header("Content-Type", "text/event-stream")
+    res.set({ 'Content-Type': 'application/json; charset=utf-8',
+              'Cache-Control': 'no-cache'});
 
     const child = child_process.execFile(
         "../sapebook2pdf",
-        [cookieFilePath, url, folder, pages, folder, path.join("web", filePath)],
+        [cookieFilePath, url, tmpDir, pages, tmpDir, path.join("web", pdfOutPath)],
         (error, _stdout, _stderr) => {
             if (!error) {
-                res.write(`\nDownload at: ${req.protocol}://${req.headers.host}/${filePath}`)
+                res.write(`\nDownload at: ${req.protocol}://${req.headers.host}/${pdfOutPath}`)
                 res.end()
-                rimraf.sync(folder)
+                rimraf.sync(tmpDir)
             } else {
                 res.end()
-                rimraf.sync(folder)
+                rimraf.sync(tmpDir)
             }
         }
     )
