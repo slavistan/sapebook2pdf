@@ -58,4 +58,4 @@ async function execScript(req, res) {
 const app = express()
 app.use(serveStatic("web", { index: ["index.html"] }))
 app.post("/create", upload.single("cookies"), execScript)
-app.listen(3000)
+app.listen(5000)
