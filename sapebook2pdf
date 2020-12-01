@@ -342,6 +342,8 @@ case "$1" in
 	fi
 	if genpdfs "$svgdir" "$pdfdir"; then
 		collatepdfs "$pdfdir" "$outfile"
+	else
+		return 1
 	fi
 esac
 
