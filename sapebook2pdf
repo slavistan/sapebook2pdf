@@ -260,14 +260,13 @@ genpdfs() {
 		# NOTE: We use inkscape for the conversion between SVGs and PDFs.
 		#       For unknown reasons 'rsvg-convert', which was used prior to
 		#       that, began to distort the images embedded in the SVGs.
+		#       Also, see the HACK note below.
 		if ! cat "$svgfile" | inkscape --pipe --export-filename="$pdffile" 2>/dev/null; then
 		errpgs="${errpgs:+$errpgs, }$svgfile"
 		fi
 	done <<-EOF
 	$svgs
 	EOF
-	kill $xvfbpid
-	DISPLAY="$disp"
 	if [ -z "$errpgs" ]; then
 		printf "\033[2K\r - [\033[32;1m✔\033[0m] Generating PDF pages from SVGs ... success.\n"
 	else
@@ -302,7 +301,7 @@ collatepdfs() {
 		printf " - [\033[31;1m✗\033[0m] Output path is accessible ... fail. Abort.\n"
 		return 1
 	fi
-	
+
 	# Retrieve pdf files in dir (in order)
 	if pdfs="$(find "$pdfdir" -maxdepth 1 -mindepth 1 -type f | sort -V |
 		grep '/page[1-9][0-9]*\.pdf$')"; then
