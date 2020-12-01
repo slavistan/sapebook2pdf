@@ -30,18 +30,17 @@ async function execScript(req, res) {
 
     const cookieFilePath = path.join(folder, "cookies.txt")
     fs.writeFileSync(cookieFilePath, file.buffer)
-
-    const filePath = path.join("web", "pdfs", Math.random().toString(36).substring(7) + ".pdf")
+    const filePath = path.join("pdfs", Math.random().toString(36).substring(7) + ".pdf")
 
     res.header("Cache-Control", "no-cache")
     res.header("Content-Type", "text/event-stream")
 
     const child = child_process.execFile(
         "../sapebook2pdf",
-        [cookieFilePath, url, folder, pages, folder, filePath],
+        [cookieFilePath, url, folder, pages, folder, path.join("web", filePath)],
         (error, _stdout, _stderr) => {
             if (!error) {
-                res.write(`\nDownload at: ${filePath}`)
+                res.write(`\nDownload at: ${req.protocol}://${req.headers.host}/${filePath}`)
                 res.end()
                 rimraf.sync(folder)
             } else {
