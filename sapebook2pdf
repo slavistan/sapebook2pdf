@@ -252,19 +252,27 @@ genpdfs() {
 
 	ii=0
 	errpgs=""
+	# HACK: inkscape is terminally stupid and cannot execute cli commands
+	#		without an X server. Come back once that's fixed.
+	Xvfb :1 &
+	xvfbpid=$!
+	disp="$DISPLAY"
+	DISPLAY=:1
 	while read svgfile; do
 		pdffile="$pdfdir/$(basename -s '.svg' "$svgfile").pdf"
 		ii=$((ii + 1))
 
 		printf "\033[2K\r - [ ] Generating PDF pages from SVGs ... %d/%d" "$ii" "$numpgs"
 
-		#if ! cat "$svgfile" | inkscape --pipe --export-filename="$pdffile" 2>/dev/null; then
-		if ! rsvg-convert -f pdf -o "$pdffile" "$svgfile" 2>/dev/null; then
+		if ! cat "$svgfile" | inkscape --pipe --export-filename="$pdffile" 2>/dev/null; then
+		#if ! rsvg-convert -f pdf -o "$pdffile" "$svgfile" 2>/dev/null; then
 		errpgs="${errpgs:+$errpgs, }$svgfile"
 		fi
 	done <<-EOF
 	$svgs
 	EOF
+	kill $xvfbpid
+	DISPLAY="$disp"
 	if [ -z "$errpgs" ]; then
 		printf "\033[2K\r - [\033[32;1m✔\033[0m] Generating PDF pages from SVGs ... success.\n"
 	else
