@@ -2,6 +2,8 @@
 
 For usage instructions see `sapebook2pdf --help`.
 
+![](demo.gif)
+
 ### Dependencies (sufficient)
 
  + GNU/Linux

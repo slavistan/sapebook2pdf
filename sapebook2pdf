@@ -276,6 +276,8 @@ collatepdfs() {
 	pdfdir="$1" # input directory containing page%d.png files
 	outfile="$2" # output file path for final pdf
 
+	echo "Collating PDF pages [collatepdfs]"
+
 	# Check input directory
 	if [ -d "$pdfdir" ] && [ -w "$pdfdir" ] &&
 		pdfdir="$(realpath "$pdfdir")"; then
