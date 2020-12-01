@@ -252,20 +252,15 @@ genpdfs() {
 
 	ii=0
 	errpgs=""
-	# HACK: inkscape is terminally stupid and cannot execute cli commands
-	#		without an X server. Come back once that's fixed.
-	Xvfb :1 &
-	xvfbpid=$!
-	disp="$DISPLAY"
-	DISPLAY=:1
 	while read svgfile; do
 		pdffile="$pdfdir/$(basename -s '.svg' "$svgfile").pdf"
 		ii=$((ii + 1))
 
 		printf "\033[2K\r - [ ] Generating PDF pages from SVGs ... %d/%d" "$ii" "$numpgs"
-
+		# NOTE: We use inkscape for the conversion between SVGs and PDFs.
+		#       For unknown reasons 'rsvg-convert', which was used prior to
+		#       that, began to distort the images embedded in the SVGs.
 		if ! cat "$svgfile" | inkscape --pipe --export-filename="$pdffile" 2>/dev/null; then
-		#if ! rsvg-convert -f pdf -o "$pdffile" "$svgfile" 2>/dev/null; then
 		errpgs="${errpgs:+$errpgs, }$svgfile"
 		fi
 	done <<-EOF
@@ -338,6 +333,15 @@ case "$1" in
 	"$@"
 	;;
 *)
+	# HACK: inkscape is terminally stupid and cannot execute cli commands
+	#       without an X server. We use Xvfb to entertain inkscape. Note that
+	#       we cannot shut down Xvfb safely as multiple instances of this may
+	#       be running concurrently. Come back once that's fixed in inkscape.
+	if [ -z "$DISPLAY" ]; then
+		DISPLAY=:1
+		Xvfb $DISPLAY &
+	fi
+
 	cookies="$1"
 	baseurl="$2"
 	svgdir="$3"
