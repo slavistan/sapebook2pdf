@@ -22,6 +22,11 @@ function parsePages(pages) {
 }
 
 async function execScript(req, res) {
+    if (!req.file) {
+        res.send("The file must not be empty.")
+        return
+    }
+
     const file = req.file
     const pages = parsePages(req.body.pages.toString())
     const url = req.body.baseUrl
