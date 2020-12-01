@@ -4,7 +4,7 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "start": "npm i && node index.js"
     },
     "author": "js-soft <julian.koenig@js-soft.com> (https://www.js-soft.com/)",
     "license": "ISC",
