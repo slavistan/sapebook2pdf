@@ -257,7 +257,9 @@ genpdfs() {
 		ii=$((ii + 1))
 
 		printf "\033[2K\r - [ ] Generating PDF pages from SVGs ... %d/%d" "$ii" "$numpgs"
-		if ! cat "$svgfile" | inkscape --pipe --export-filename="$pdffile" 2>/dev/null; then
+
+		#if ! cat "$svgfile" | inkscape --pipe --export-filename="$pdffile" 2>/dev/null; then
+		if ! rsvg-convert -f pdf -o "$pdffile" "$svgfile" 2>/dev/null; then
 		errpgs="${errpgs:+$errpgs, }$svgfile"
 		fi
 	done <<-EOF
