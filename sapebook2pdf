@@ -350,9 +350,8 @@ case "$1" in
 	else
 		return 1
 	fi
-	if genpdfs "$svgdir" "$pdfdir"; then
-		collatepdfs "$pdfdir" "$outfile"
-	else
+	genpdfs "$svgdir" "$pdfdir"
+	if ! collatepdfs "$pdfdir" "$outfile"; then
 		return 1
 	fi
 esac
