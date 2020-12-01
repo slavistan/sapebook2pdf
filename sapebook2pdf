@@ -299,8 +299,8 @@ collatepdfs() {
 	fi
 	
 	# Retrieve pdf files in dir (in order)
-	if pdfs="$(find "$pdfdir" -maxdepth 1 -mindepth 1 -type f |
-		grep '/page[1-9][0-9]*\.pdf$' | sort -V)"; then
+	if pdfs="$(find "$pdfdir" -maxdepth 1 -mindepth 1 -type f | sort -V |
+		grep '/page[1-9][0-9]*\.pdf$')"; then
 		numpdfs="$(echo "$pdfs" | wc -l)"
 		printf " - [\033[32;1m✔\033[0m] Found %d PDF file(s) ... success.\n" "$numpdfs"
 	else
@@ -317,59 +317,6 @@ collatepdfs() {
 		printf "\033[2K\r - [\033[31;1m✗\033[0m] Generating PDF ... fail. Abort.\n"
 		return 1
 	fi
-}
-
-# Parse args and initialize globals
-setup() {
-	for arg in "$@"; do
-		if echo "$arg" | grep -q '^--pdfout='; then
-			pdfout="${arg:s/--pdfout=//}"
-			pdfout="$(echo "$pdfout" | sed 's|^~|'"$HOME"'|')"
-		elif echo "$arg" | grep -q '^--cookies='; then
-			cks="${arg:s/--cookies=//}"
-			cks="$(echo "$cks" | sed 's|^~|'"$HOME"'|')"
-		elif echo "$arg" | grep -q '^--baseurl='; then
-			baseurl="${arg:s/--baseurl=//}"
-		elif echo "$arg" | grep -q '^--pages='; then
-			range="${arg:s/--pages=//}"
-			if ! echo "$range" | grep -q '^[1-9]\+[0-9]*-[1-9]\+[0-9]*'; then
-				echo "Invalid page range." >&2
-				return 1
-			fi
-			n="$(echo "$range" | cut -d '-' -f1)"
-			m="$(echo "$range" | cut -d '-' -f2)"
-			if [ $n -gt $m ] || [ $m -le 0 ]; then
-				echo "Invalid page range." >&2
-				return 1
-			fi
-			pages="$(seq -s ' ' $n $m)"
-		elif [ "$arg" = "--nocheckfont" ]; then
-			nocheckfont=1
-		elif [ "$arg" = "--nocleanup" ]; then
-			nocleanup=1
-		else
-			echo "Unrecognized parameter '$arg'." >&2
-			return 1
-		fi
-	done
-
-	if [ ! -r "$cks" ]; then
-		echo "Cannot read cookies file '$cks'."
-		return 1
-	fi
-	if [ ! -d "${pdfout:h}" ]; then
-		echo "Output directory '${pdfout:h}' does not exist."
-		return 1
-	fi
-	if ! tmpdir="$(mktemp -d)"; then
-		echo "Cannot create temporary directory."
-		return 1
-	fi
-
-	pageurlt="$baseurl/xml/topic%{pgnum}.svg" # remote page url template
-	svgpatht="$tmpdir/page%{pgnum}.svg" # local svg page path template
-	pdfpatht="$tmpdir/page%{pgnum}.pdf" # local pdf page path template
-	numpgs="$(echo "$pages" | wc -l)" # total number of pages
 }
 
 case "$1" in
