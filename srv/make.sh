@@ -49,7 +49,7 @@ watch)
 	EOF
 	;;
 start)
-	Rscritp app.R
+	Rscript app.R
 	;;
 _reload)
 	_reload surf shiny
