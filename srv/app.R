@@ -5,8 +5,11 @@ library(R.utils)
 ui <- fluidPage(
 	shinyjs::useShinyjs(),
 	tags$head(
-	   tags$style("
-		.btn { width: 100%; }"
+	   tags$style(HTML("
+		.btn { width: 100%; }
+		#infoText { max-height: 200px }
+		"
+		)
 	)),
 
 	# App title ----
@@ -41,10 +44,7 @@ ui <- fluidPage(
 			  ),
 
 			hr(),
-
-			# Output: Live debugging information
 			verbatimTextOutput(outputId = "infoText"),
-
 		),
 
 		# Main panel for displaying outputs ----
@@ -69,7 +69,6 @@ server <- function(input, output, session) {
 
 		isolate({
 
-
 		##
 		## Check inputs
 		##
@@ -90,14 +89,14 @@ server <- function(input, output, session) {
 				stdout=T, stderr=T)
 		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, int(attr(ret, "status")))
 		# ^--- this is exactly why using R for anything outside of statistics is bullshit
-		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+		reactives$console <- paste(ret, collapse="\n")
 		if (retcode != 0) {
 			return()
 		}
 
-		#
-		# Download SVGs
-		#
+		##
+		## Download SVGs
+		##
 		reactives$tmpdir <- tempdir()
 		pages <- paste(seq(1, input$pgnum), collapse=",")
 
