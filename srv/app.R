@@ -167,3 +167,5 @@ app <- shinyApp(ui=ui, server=server, options=list(autoreload=T))
 port <- as.integer(Sys.getenv("PORT", unset=5000))
 host <- "0.0.0.0"
 runApp(app, port=port, host=host)
+
+# TODO: Document shiny app
