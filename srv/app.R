@@ -58,7 +58,7 @@ ui <- fluidPage(
 )
 
 # Define server logic required to draw a histogram ----
-server <- function(input, output, session) {
+server <- function(input, output) {
 	# Reactive: Aggregated console output
 	reactives <- reactiveValues(console="", pdfpath="")
 
@@ -99,8 +99,8 @@ server <- function(input, output, session) {
 		##
 		## Download SVGs
 		##
-		printf("Downloading SVGs ...\n")
 		reactives$tmpdir <- tempdir()
+		printf("Downloading SVGs ... tmpdir = '%s'\n", reactives$tmpdir)
 		pages <- paste(seq(1, input$pgnum), collapse=",")
 
 		ret <- system2("sapebook2pdf",
@@ -122,7 +122,7 @@ server <- function(input, output, session) {
 		##
 		## Generate PDF pages
 		##
-		printf("Generate PDF pages ...\n")
+		printf("Generating PDF pages ...\n")
 		ret <- system2("sapebook2pdf",
 				args=c("@", "genpdfs", reactives$tmpdir, reactives$tmpdir),
 				stdout=T, stderr=T)
@@ -132,7 +132,7 @@ server <- function(input, output, session) {
 		##
 		## Collate PDF pages
 		##
-		printf("Collate PDF pages ...\n")
+		printf("Collating PDF pages ...\n")
 		reactives$pdfpath <- paste0(reactives$tmpdir, "/ebook.pdf")
 		ret <- system2("sapebook2pdf",
 				args=c("@", "collatepdfs", reactives$tmpdir, reactives$pdfpath),

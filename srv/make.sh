@@ -52,7 +52,12 @@ start)
 	Rscript app.R
 	;;
 _reload)
-	_reload surf shiny
+	# Inkscape HACK. See sapebook2pdf.
+	if [ -z "$DISPLAY" ]; then
+		disp=":1"
+		Xvfb "$disp" &
+	fi
+	DISPLAY="$disp" _reload surf shiny
 	;;
 @)
 	shift

@@ -258,14 +258,12 @@ genpdfs() {
 
 	# HACK: We use inkscape for the conversion between SVGs and PDFs.
 	#       For unknown reasons 'rsvg-convert', which was used prior to that,
-	#       began to distort the images embedded in the SVGs.  inkscape is
+	#       began to distort the images embedded in the SVGs. inkscape is
 	#       terminally stupid and cannot execute cli commands without an X
-	#       server. We use Xvfb to entertain inkscape. Note that we cannot shut
-	#       down Xvfb safely as multiple instances of this script may be
-	#       running concurrently. Come back once that's fixed in inkscape.
+	#       server. Use Xvfb to entertain inkscape. Come back once that's
+	#       fixed in inkscape.
 	if [ -z "$DISPLAY" ]; then
-		DISPLAY=:1
-		Xvfb $DISPLAY &
+		echo "WARNING: No X server running. Incscape will not work properly."
 	fi
 
 	ii=0
