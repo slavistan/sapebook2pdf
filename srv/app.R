@@ -87,7 +87,7 @@ server <- function(input, output, session) {
 		ret <- system2("sapebook2pdf",
 				args=c("@", "checkconn", input$cookiesFile$datapath, input$baseUrl),
 				stdout=T, stderr=T)
-		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, int(attr(ret, "status")))
+		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
 		# ^--- this is exactly why using R for anything outside of statistics is bullshit
 		reactives$console <- paste(ret, collapse="\n")
 		if (retcode != 0) {
@@ -103,7 +103,7 @@ server <- function(input, output, session) {
 		ret <- system2("sapebook2pdf",
 				args=c("@", "dlsvgs", input$cookiesFile$datapath, input$baseUrl, reactives$tmpdir, pages),
 				stdout=T, stderr=T)
-		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, int(attr(ret, "status")))
+		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
 		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
 
 		##
@@ -112,7 +112,7 @@ server <- function(input, output, session) {
 		ret <- system2("sapebook2pdf",
 				args=c("@", "checkfonts", reactives$tmpdir),
 				stdout=T, stderr=T)
-		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, int(attr(ret, "status")))
+		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
 		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
 
 		##
@@ -121,7 +121,7 @@ server <- function(input, output, session) {
 		ret <- system2("sapebook2pdf",
 				args=c("@", "genpdfs", reactives$tmpdir, reactives$tmpdir),
 				stdout=T, stderr=T)
-		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, int(attr(ret, "status")))
+		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
 		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
 		reactives$pdfpage1 <- paste(reactives$tmpdir, "/page1.pdf")
 
@@ -132,7 +132,7 @@ server <- function(input, output, session) {
 		ret <- system2("sapebook2pdf",
 				args=c("@", "collatepdfs", reactives$tmpdir, reactives$pdfpath),
 				stdout=T, stderr=T)
-		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, int(attr(ret, "status")))
+		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
 		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
 
 		shinyjs::enable("buttonDownload")
