@@ -22,7 +22,7 @@ ui <- fluidPage(
 		sidebarPanel(
 
 			# Input: cookies.txt upload
-			fileInput("cookiesFile", "Upload cookies file",
+			fileInput("cookiesFile", "Upload Cookies File",
 				multiple = FALSE,
 				accept = c("text/plain")),
 

@@ -22,7 +22,7 @@ _reload() {
 	fi
 }
 
-start() {
+_start() {
 	if echo "$@" | grep -q 'shiny'; then
 		echo "start shiny"
 		Rscript app.R &
@@ -42,11 +42,14 @@ trap _cleanup INT
 export PORT=5000
 case "$1" in
 watch)
-	start surf shiny
+	_start surf shiny
 	entr -pc "$0" _reload <<-EOF
 	app.R
 	make.sh
 	EOF
+	;;
+start)
+	Rscritp app.R
 	;;
 _reload)
 	_reload surf shiny
