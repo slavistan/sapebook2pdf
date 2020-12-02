@@ -1,57 +1,135 @@
 library(shiny)
+library(R.utils)
 
 # Define UI for app that draws a histogram ----
 ui <- fluidPage(
 
-  # App title ----
-  titlePanel("Hello Shiny!"),
+	# App title ----
+	titlePanel("Hello Shiny!"),
 
-  # Sidebar layout with input and output definitions ----
-  sidebarLayout(
+	# Sidebar layout with input and output definitions ----
+	sidebarLayout(
 
-    # Sidebar panel for inputs ----
-    sidebarPanel(
+		# Sidebar panel for inputs ----
+		sidebarPanel(
 
-      # Input: Slider for the number of bins ----
-      sliderInput(inputId = "bins",
-                  label = "Number of blarbsds:",
-                  min = 1,
-                  max = 50,
-                  value = 30)
+			# Input: cookies.txt upload
+			fileInput("cookiesFile", "Choose cookies file",
+				multiple = FALSE,
+				accept = c("text/plain")),
 
-    ),
+			# Input: Baseurl
+			textInput("baseUrl", "Base URL (location of index.html)",
+				value="https://saplearninghub.plateau.com/icontent_e/CUSTOM_eu/sap/self-managed/ebook/BC100_EN_Col18/"),
 
-    # Main panel for displaying outputs ----
-    mainPanel(
+			# Input: Lower page num
+			numericInput("pgnumLow", "First page",
+				min=1,
+				value=1),
 
-      # Output: Histogram ----
-      plotOutput(outputId = "distPlot")
+			# Input: Upper page num
+			numericInput("pgnumHigh", "Last page",
+				min=1,
+				value=2),
 
-    )
-  )
+			# Input: Execute button
+			actionButton("buttonGo", "Execute",
+				width="100%")
+		),
+
+		# Main panel for displaying outputs ----
+		mainPanel(
+
+			textOutput(outputId = "cookiesPath"),
+
+			# Output: Live debugging information
+			verbatimTextOutput(outputId = "infoText"),
+
+		)
+	)
 )
 
 # Define server logic required to draw a histogram ----
-server <- function(input, output) {
+server <- function(input, output, session) {
+	# Reactive: Aggregated console output
+	reactives <- reactiveValues(console="")
 
-  # Histogram of the Old Faithful Geyser Data ----
-  # with requested number of bins
-  # This expression that generates a histogram is wrapped in a call
-  # to renderPlot to indicate that:
-  #
-  # 1. It is "reactive" and therefore should be automatically
-  #    re-executed when inputs (input$bins) change
-  # 2. Its output type is a plot
-  output$distPlot <- renderPlot({
+	observe({
+		input$buttonGo
 
-    x    <- faithful$waiting
-    bins <- seq(min(x), max(x), length.out = input$bins + 1)
+		isolate({
 
-    hist(x, breaks = bins, col = "#75AADB", border = "white",
-         xlab = "Waiting time to next eruption (in mins)",
-         main = "Histogram of waiting times")
+		##
+		## Check inputs
+		##
+		if (is.null(input$pgnumLow) || is.null(input$pgnumHigh) || input$pgnumLow > input$pgnumHigh ||
+			is.null(input$baseUrl) ||
+			is.null(input$cookiesFile)) {
 
-    })
+			reactives$console <- "Missing inputs."
+			return()
+		}
+		reactives$console <- ""
+
+		##
+		## Check connection
+		##
+		ret <- system2("sapebook2pdf",
+				args=c("@", "checkconn", input$cookiesFile$datapath, input$baseUrl),
+				stdout=T, stderr=T)
+		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, int(attr(ret, "status")))
+		# ^--- this is exactly why using R for anything outside of statistics is bullshit
+		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+		if (retcode != 0) {
+			return()
+		}
+
+		#
+		# Download SVGs
+		#
+		reactives$tmpdir <- tempdir()
+		pages <- paste(seq(input$pgnumLow, input$pgnumHigh), collapse=",")
+
+		ret <- system2("sapebook2pdf",
+				args=c("@", "dlsvgs", input$cookiesFile$datapath, input$baseUrl, reactives$tmpdir, pages),
+				stdout=T, stderr=T)
+		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, int(attr(ret, "status")))
+		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+
+		##
+		## Check fonts
+		##
+		ret <- system2("sapebook2pdf",
+				args=c("@", "checkfonts", reactives$tmpdir),
+				stdout=T, stderr=T)
+		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, int(attr(ret, "status")))
+		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+
+		##
+		## Generate PDF pages
+		##
+		ret <- system2("sapebook2pdf",
+				args=c("@", "genpdfs", reactives$tmpdir, reactives$tmpdir),
+				stdout=T, stderr=T)
+		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, int(attr(ret, "status")))
+		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+
+		##
+		## Collate PDF pages
+		##
+		ret <- system2("sapebook2pdf",
+				args=c("@", "collatepdfs", reactives$tmpdir, paste0(reactives$tmpdir, "/ebook.pdf")),
+				stdout=T, stderr=T)
+		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, int(attr(ret, "status")))
+		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+
+		}) # isolate()
+	})
+
+	output$infoText <- renderText({
+		return(reactives$console)
+	})
+
 }
 
 

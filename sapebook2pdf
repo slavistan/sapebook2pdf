@@ -67,105 +67,111 @@ dlsvgs() {
 
 	# Check pages
 	if echo "$pages" | grep -q '^[1-9][0-9]*\(,[1-9][0-9]*\)*$'; then
-		printf " - [\033[32;1m✔\033[0m] Pages are comma-sep'd list ... success.\n"
+		printf " - [✔] Pages are comma-sep'd list ... success.\n"
 	else
-		printf " - [\033[31;1m✗\033[0m] Pages are comma-sep'd list ... fail. Abort.\n"
+		printf " - [✗] Pages are comma-sep'd list ... fail. Abort.\n"
 		return 1
 	fi
 
 	# Check output directory
 	if [ -d "$outdir" ] && [ -w "$outdir" ] &&
 		outdir="$(realpath "$outdir")"; then
-		printf " - [\033[32;1m✔\033[0m] Output directory '%s' is accessible ... success.\n" "$outdir"
+		printf " - [✔] Output directory '%s' is accessible ... success.\n" "$outdir"
 	else
-		printf " - [\033[31;1m✗\033[0m] Output directory '%s' is accessible ... fail. Abort.\n" "$outdir"
+		printf " - [✗] Output directory '%s' is accessible ... fail. Abort.\n" "$outdir"
 		return 1
 	fi
 
 	# Check connection
-	printf "\033[2K\r - [ ] Checking connection ... "
 	if checkconn "$cookies" "$baseurl" >/dev/null; then
-		printf "\033[2K\r - [\033[32;1m✔\033[0m] Checking connection ... success.\n"
+		printf " - [✔] Checking connection ... success.\n"
 	else
-		printf "\033[2K\r - [\033[31;1m✗\033[0m] Checking connection ... fail. Abort.\n"
+		printf " - [✗] Checking connection ... fail. Abort.\n"
 		return 1
 	fi
 
 	# Download svg files
 	ii=0
 	numpgs="$(( 1 + $(echo "$pages" | tr -cd ',' | wc -c) ))"
-	errpgs="" # pgnums whose dl failed; csv
-	printf "\033[2K\r - [ ] Downloading SVGs ... "
+	goterr=0
 	for pgnum in $(echo "$pages" | tr ',' ' '); do
-		pageurl="$baseurl/xml/topic${pgnum}.svg"
-		svgpath="$outdir/page${pgnum}.svg"
 		ii=$((ii + 1))
-
-		printf "\033[2K\r - [ ] Downloading SVGs ... %d/%d" "$ii" "$numpgs"
-		reply="$(curl -Ls -b "$cookies" -c "$cookies" -w "\n%{http_code}" "$pageurl")"
-		retcode="$(echo "$reply" | tail -n 1)"
-		svg="$(echo "$reply" | head -n -1)"
-
-		if [ -z "$svg" ] || [ ! "$retcode" -eq 200 ]; then
-			errpgs="${errpgs:+$errpgs,}$pgnum"
+		if ! _dlsvg "$cookies" "$baseurl" "$outdir" "$pgnum"; then
+			printf " - [✗] Downloading SVG %d/%d ... fail.\n" "$ii" "$numpgs"
+			goterr=1
 		else
-			echo "$svg" > "$svgpath"
+			printf " - [✔] Downloading SVG %d/%d ... success.\n" "$ii" "$numpgs"
 		fi
 	done
-	if [ -z "$errpgs" ]; then
-		printf "\033[2K\r - [\033[32;1m✔\033[0m] Downloading SVGs ... success.\n"
-	else
-		printf "\033[2K\r - [\033[31;1m✗\033[0m] Downloading SVGs ... failed for page(s):\n"
-		printf "        %s\n" "$errpgs"
+
+	return "$goterr"
+}
+
+_dlsvg() {
+	# No input checking; no output statements
+
+	cookies="$1" # path to cookies.txt
+	baseurl="$2" # head of url to index.html
+	outdir="$3" # directory to dl svg files to
+	pgnum="$4" # pages to download as csv
+
+	pageurl="$baseurl/xml/topic${pgnum}.svg"
+	svgpath="$outdir/page${pgnum}.svg"
+
+	reply="$(curl -Ls -b "$cookies" -c "$cookies" -w "\n%{http_code}" "$pageurl")"
+	retcode="$(echo "$reply" | tail -n 1)"
+	svg="$(echo "$reply" | head -n -1)"
+
+	if [ -z "$svg" ] || [ ! "$retcode" -eq 200 ]; then
 		return 1
+	else
+		echo "$svg" > "$svgpath"
 	fi
 }
 
 # Check connection
 checkconn() {
+	cookies="$1"
+	baseurl="$2"
+
 	echo "Checking connection [checkconn]"
 
-	# Assert that cookiex.txt exists and is readable
-	printf "\033[2K\r - [ ] \033[3mcookies.txt\033[0m exists and is readable ... "
-	cookies=""
-	if [ -z "$1" ] || ! cookies="$(realpath "$1")" ||
+	# Assert that cookies.txt exists and is readable
+	if [ -z "$cookies" ] || ! cookies="$(realpath "$cookies")" ||
 		[ ! -f "$cookies" ] || [ ! -r "$cookies" ]; then
-		printf "\033[2K\r - [\033[31;1m✗\033[0m] \033[3mcookies.txt\033[0m is readable ... fail. Abort.\n"
+		printf " - [✗] Cookies file '%s' is readable ... fail. Abort.\n" "$cookies"
 		return 1
 	else
-		printf "\033[2K\r - [\033[32;1m✔\033[0m] \033[3mcookies.txt\033[0m is readable ... success.\n"
+		printf " - [✔] Cookies file '%s' is readable ... success.\n" "$cookies"
 	fi
 
 	# Assert that url is sane
-	printf "\033[2K\r - [ ] Baseurl is sane ... "
 	baseurl="$2"
 	if [ -z "$baseurl" ]; then
-		printf "\033[2K\r - [\033[31;1m✗\033[0m] Baseurl is sane ... fail. Abort.\n"
+		printf " - [✗] Baseurl '%s' is sane ... fail. Abort.\n" "$baseurl"
 		return 1
 	else
-		printf "\033[2K\r - [\033[32;1m✔\033[0m] Baseurl is sane ... success.\n"
+		printf " - [✔] Baseurl '%s' is sane ... success.\n" "$baseurl"
 	fi
 
 	# Attempt to download index.html
 	ret=0
-	printf "\033[2K\r - [ ] Attempting to download \033[3mindex.html\033[0m ... "
 	retcode="$(curl -Ls -b "$cookies" -c "$cookies" -w "\n%{http_code}" \
 		"$baseurl/index.html" | tail -n -1)"
 	if [ "$retcode" -eq 200 ]; then
-		printf "\033[2K\r - [\033[32;1m✔\033[0m] Attempting to download \033[3mindex.html\033[0m ... success.\n"
+		printf " - [✔] Attempting to download '%s' ... success.\n" "$baseurl/index.html"
 	else
-		printf "\033[2K\r - [\033[31;1m✗\033[0m] Attempting to download \033[3mindex.html\033[0m ... fail.\n"
+		printf " - [✗] Attempting to download '%s'... fail.\n" "$baseurl/index.html"
 		ret=1
 	fi
 
 	# Attempt to download first page
-	printf "\033[2K\r - [ ] Attempting to download \033[3mxml/topic1.svg\033[0m ... "
 	retcode="$(curl -Ls -b "$cookies" -c "$cookies" -w "\n%{http_code}" \
 		"$baseurl/xml/topic1.svg" | tail -n -1)"
 	if [ "$retcode" -eq 200 ]; then
-		printf "\033[2K\r - [\033[32;1m✔\033[0m] Attempting to download \033[3mxml/topic1.svg\033[0m ... success.\n"
+		printf " - [✔] Attempting to download '%s' ... success.\n" "$baseurl/xml/topic.svg"
 	else
-		printf "\033[2K\r - [\033[31;1m✗\033[0m] Attempting to download \033[3mxml/topic1.svg\033[0m ... fail.\n"
+		printf " - [✗] Attempting to download '%s'... fail.\n" "$baseurl/xml/topic.svg"
 		ret=1
 	fi
 	return "$ret"
@@ -180,9 +186,9 @@ checkfonts() {
 	# Check input directory
 	if [ -d "$svgdir" ] && [ -w "$svgdir" ] &&
 		svgdir="$(realpath "$svgdir")"; then
-		printf " - [\033[32;1m✔\033[0m] Input directory is accessible ... success.\n"
+		printf " - [✔] Input directory is accessible ... success.\n"
 	else
-		printf " - [\033[31;1m✗\033[0m] Input directory is accessible ... fail. Abort.\n"
+		printf " - [✗] Input directory is accessible ... fail. Abort.\n"
 		return 1
 	fi
 
@@ -190,9 +196,9 @@ checkfonts() {
 	if svgs="$(find "$svgdir" -maxdepth 1 -mindepth 1 -type f |
 		grep '/page[1-9][0-9]*\.svg$')"; then
 		numsvgs="$(echo "$svgs" | wc -l)"
-		printf " - [\033[32;1m✔\033[0m] Found %d SVG files ... success.\n" "$numsvgs"
+		printf " - [✔] Found %d SVG files ... success.\n" "$numsvgs"
 	else
-		printf " - [\033[31;1m✗\033[0m] No SVG files found ... fail. Abort.\n"
+		printf " - [✗] No SVG files found ... fail. Abort.\n"
 		return 1
 	fi
 
@@ -204,9 +210,9 @@ checkfonts() {
 	fontsavail="$(fc-list :family)"
 	while read f; do
 		if echo "$fontsavail" | grep -q "$f"; then
-			printf " - [\033[32;1m✔\033[0m] Font '%s' available.\n" "$f"
+			printf " - [✔] Font '%s' available.\n" "$f"
 		else
-			printf " - [\033[31;1m✗\033[0m] Font '%s' not available.\n" "$f"
+			printf " - [✗] Font '%s' not available.\n" "$f"
 			fontsmissing=1
 		fi
 	done <<-EOF
@@ -225,18 +231,18 @@ genpdfs() {
 	# Check input directory
 	if [ -d "$svgdir" ] && [ -w "$svgdir" ] &&
 		svgdir="$(realpath "$svgdir")"; then
-		printf " - [\033[32;1m✔\033[0m] Input directory is accessible ... success.\n"
+		printf " - [✔] Input directory is accessible ... success.\n"
 	else
-		printf " - [\033[31;1m✗\033[0m] Input directory is accessible ... fail. Abort.\n"
+		printf " - [✗] Input directory is accessible ... fail. Abort.\n"
 		return 1
 	fi
 
 	# Check output directory
 	if [ -d "$pdfdir" ] && [ -w "$pdfdir" ] &&
 		pdfdir="$(realpath "$pdfdir")"; then
-		printf " - [\033[32;1m✔\033[0m] Output directory is accessible ... success.\n"
+		printf " - [✔] Output directory is accessible ... success.\n"
 	else
-		printf " - [\033[31;1m✗\033[0m] Output directory is accessible ... fail. Abort.\n"
+		printf " - [✗] Output directory is accessible ... fail. Abort.\n"
 		return 1
 	fi
 
@@ -244,36 +250,33 @@ genpdfs() {
 	if svgs="$(find "$svgdir" -maxdepth 1 -mindepth 1 -type f |
 		grep '/page[1-9][0-9]*\.svg$')"; then
 		numsvgs="$(echo "$svgs" | wc -l)"
-		printf " - [\033[32;1m✔\033[0m] Found %d SVG file(s) ... success.\n" "$numsvgs"
+		printf " - [✔] Found %d SVG file(s) ... success.\n" "$numsvgs"
 	else
-		printf " - [\033[31;1m✗\033[0m] No SVG files found ... fail. Abort.\n"
+		printf " - [✗] No SVG files found ... fail. Abort.\n"
 		return 1
 	fi
 
 	ii=0
-	errpgs=""
+	goterr=0
 	while read svgfile; do
 		pdffile="$pdfdir/$(basename -s '.svg' "$svgfile").pdf"
 		ii=$((ii + 1))
 
-		printf "\033[2K\r - [ ] Generating PDF pages from SVGs ... %d/%d" "$ii" "$numpgs"
 		# NOTE: We use inkscape for the conversion between SVGs and PDFs.
 		#       For unknown reasons 'rsvg-convert', which was used prior to
 		#       that, began to distort the images embedded in the SVGs.
 		#       Also, see the HACK note below.
 		if ! cat "$svgfile" | inkscape --pipe --export-filename="$pdffile" 2>/dev/null; then
-		errpgs="${errpgs:+$errpgs, }$svgfile"
+			printf " - [✗] Converting SVG %d/%d ... fail.\n" "$ii" "$numsvgs"
+			goterr=1
+		else
+			printf " - [✔] Converting SVG %d/%d ... success.\n" "$ii" "$numsvgs"
 		fi
 	done <<-EOF
 	$svgs
 	EOF
-	if [ -z "$errpgs" ]; then
-		printf "\033[2K\r - [\033[32;1m✔\033[0m] Generating PDF pages from SVGs ... success.\n"
-	else
-		printf "\033[2K\r - [\033[31;1m✗\033[0m] Generating PDF pages from SVGs  ... failed for page(s):\n"
-		printf "        %s\n" "$errpgs"
-		return 1
-	fi
+
+	return "$goterr"
 }
 
 collatepdfs() {
@@ -285,9 +288,9 @@ collatepdfs() {
 	# Check input directory
 	if [ -d "$pdfdir" ] && [ -w "$pdfdir" ] &&
 		pdfdir="$(realpath "$pdfdir")"; then
-		printf " - [\033[32;1m✔\033[0m] Input directory is accessible ... success.\n"
+		printf " - [✔] Input directory is accessible ... success.\n"
 	else
-		printf " - [\033[31;1m✗\033[0m] Input directory is accessible ... fail. Abort.\n"
+		printf " - [✗] Input directory is accessible ... fail. Abort.\n"
 		return 1
 	fi
 
@@ -296,9 +299,9 @@ collatepdfs() {
 	if [ -n "$outfile" ] && outfile="$(realpath "$outfile")" &&
 		outdir="$(dirname "$outdir")" && [ -d "$outdir" ] &&
 		[ -w "$outdir" ]; then
-		printf " - [\033[32;1m✔\033[0m] Output path is accessible ... success.\n"
+		printf " - [✔] Output path is accessible ... success.\n"
 	else
-		printf " - [\033[31;1m✗\033[0m] Output path is accessible ... fail. Abort.\n"
+		printf " - [✗] Output path is accessible ... fail. Abort.\n"
 		return 1
 	fi
 
@@ -306,19 +309,18 @@ collatepdfs() {
 	if pdfs="$(find "$pdfdir" -maxdepth 1 -mindepth 1 -type f | sort -V |
 		grep '/page[1-9][0-9]*\.pdf$')"; then
 		numpdfs="$(echo "$pdfs" | wc -l)"
-		printf " - [\033[32;1m✔\033[0m] Found %d PDF file(s) ... success.\n" "$numpdfs"
+		printf " - [✔] Found %d PDF file(s) ... success.\n" "$numpdfs"
 	else
-		printf " - [\033[31;1m✗\033[0m] No PDF files found ... fail. Abort.\n"
+		printf " - [✗] No PDF files found ... fail. Abort.\n"
 		return 1
 	fi
 
 	# Generate pdf from individual pages
-	printf " - [ ] Generating PDF ..."
 	if echo "$pdfs" | tr '\n' '\0' |
 		xargs -0 sh -c 'pdftk "$@" cat output '"$outfile" "$0" 2>/dev/null; then
-		printf "\033[2K\r - [\033[32;1m✔\033[0m] Generating PDF ... success.\n"
+		printf " - [✔] Generating PDF '$outfile' ... success.\n" "$outfile"
 	else
-		printf "\033[2K\r - [\033[31;1m✗\033[0m] Generating PDF ... fail. Abort.\n"
+		printf " - [✗] Generating PDF '$outfile' ... fail. Abort.\n" "$outfile"
 		return 1
 	fi
 }

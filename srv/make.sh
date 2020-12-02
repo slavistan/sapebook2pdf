@@ -1,19 +1,19 @@
 #!/usr/bin/env sh
 
-cleanup() {
+_cleanup() {
 	{ kill $(cat /tmp/sapebook2pdf-surf-pid)
 	rm /tmp/sapebook2pdf-surf-pid
 	kill $(cat /tmp/sapebook2pdf-shiny-pid)
 	rm /tmp/sapebook2pdf-shiny-pid; } 2>/dev/null
 }
 
-reload() {
+_reload() {
 	if echo "$@" | grep -q 'shiny'; then
 		echo "reload shiny"
 		kill $(cat /tmp/sapebook2pdf-shiny-pid)
 		Rscript app.R &
 		echo "$!" > /tmp/sapebook2pdf-shiny-pid
-		sleep 1.0 # startup time
+		sleep 2.0 # startup time
 	fi
 
 	if echo "$@" | grep -q 'surf'; then
@@ -23,31 +23,39 @@ reload() {
 }
 
 start() {
-	if echo "$@" | grep -q 'surf'; then
-		echo "start surf"
-		surf localhost:"$PORT" &
-		echo "$!" > /tmp/sapebook2pdf-surf-pid
-	fi
-
 	if echo "$@" | grep -q 'shiny'; then
 		echo "start shiny"
-		Rscript app.R >/dev/null 2>&1 &
+		Rscript app.R &
 		echo "$!" > /tmp/sapebook2pdf-shiny-pid
+		sleep 2.0
+	fi
+
+	if echo "$@" | grep -q 'surf'; then
+		echo "start surf"
+		surf "localhost:$PORT" &
+		echo "$!" > /tmp/sapebook2pdf-surf-pid
 	fi
 }
 
-trap cleanup INT
+trap _cleanup INT
 
 export PORT=5000
 case "$1" in
 watch)
 	start surf shiny
-	entr -pc "$0" reload <<-EOF
+	entr -pc "$0" _reload <<-EOF
 	app.R
 	make.sh
 	EOF
 	;;
-reload)
-	reload surf shiny
+_reload)
+	_reload surf shiny
+	;;
+@)
+	shift
+	"$@"
+	;;
+*)
+	echo "Shiny server hot reload. Usage: $0 watch"
 	;;
 esac
