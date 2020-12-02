@@ -3,6 +3,11 @@ library(R.utils)
 
 # Define UI for app that draws a histogram ----
 ui <- fluidPage(
+	shinyjs::useShinyjs(),
+	tags$head(
+	   tags$style("
+		.btn { width: 100%; }"
+	)),
 
 	# App title ----
 	titlePanel("Hello Shiny!"),
@@ -14,36 +19,39 @@ ui <- fluidPage(
 		sidebarPanel(
 
 			# Input: cookies.txt upload
-			fileInput("cookiesFile", "Choose cookies file",
+			fileInput("cookiesFile", "Upload cookies file",
 				multiple = FALSE,
 				accept = c("text/plain")),
 
 			# Input: Baseurl
-			textInput("baseUrl", "Base URL (location of index.html)",
+			textInput("baseUrl", "Base URL",
 				value="https://saplearninghub.plateau.com/icontent_e/CUSTOM_eu/sap/self-managed/ebook/BC100_EN_Col18/"),
 
 			# Input: Lower page num
-			numericInput("pgnumLow", "First page",
+			numericInput("pgnum", "Number of Pages",
 				min=1,
 				value=1),
 
-			# Input: Upper page num
-			numericInput("pgnumHigh", "Last page",
-				min=1,
-				value=2),
+			fluidRow(
+				# Input: Execute button
+				column(6, actionButton("buttonGo", "Convert")),
 
-			# Input: Execute button
-			actionButton("buttonGo", "Execute",
-				width="100%")
+				# Input: Download button
+				column(6, downloadButton("buttonDownload", "Download"))
+			  ),
+
+			hr(),
+
+			# Output: Live debugging information
+			verbatimTextOutput(outputId = "infoText"),
+
 		),
 
 		# Main panel for displaying outputs ----
 		mainPanel(
 
-			textOutput(outputId = "cookiesPath"),
-
-			# Output: Live debugging information
-			verbatimTextOutput(outputId = "infoText"),
+			# Output: PDF preview
+			htmlOutput('preview')
 
 		)
 	)
@@ -52,17 +60,20 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram ----
 server <- function(input, output, session) {
 	# Reactive: Aggregated console output
-	reactives <- reactiveValues(console="")
+	reactives <- reactiveValues(console="", pdfpath="")
 
 	observe({
 		input$buttonGo
 
+		shinyjs::disable("buttonDownload")
+
 		isolate({
+
 
 		##
 		## Check inputs
 		##
-		if (is.null(input$pgnumLow) || is.null(input$pgnumHigh) || input$pgnumLow > input$pgnumHigh ||
+		if (is.null(input$pgnum) ||
 			is.null(input$baseUrl) ||
 			is.null(input$cookiesFile)) {
 
@@ -88,7 +99,7 @@ server <- function(input, output, session) {
 		# Download SVGs
 		#
 		reactives$tmpdir <- tempdir()
-		pages <- paste(seq(input$pgnumLow, input$pgnumHigh), collapse=",")
+		pages <- paste(seq(1, input$pgnum), collapse=",")
 
 		ret <- system2("sapebook2pdf",
 				args=c("@", "dlsvgs", input$cookiesFile$datapath, input$baseUrl, reactives$tmpdir, pages),
@@ -113,21 +124,36 @@ server <- function(input, output, session) {
 				stdout=T, stderr=T)
 		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, int(attr(ret, "status")))
 		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+		reactives$pdfpage1 <- paste(reactives$tmpdir, "/page1.pdf")
 
 		##
 		## Collate PDF pages
 		##
+		reactives$pdfpath <- paste0(reactives$tmpdir, "/ebook.pdf")
 		ret <- system2("sapebook2pdf",
-				args=c("@", "collatepdfs", reactives$tmpdir, paste0(reactives$tmpdir, "/ebook.pdf")),
+				args=c("@", "collatepdfs", reactives$tmpdir, reactives$pdfpath),
 				stdout=T, stderr=T)
 		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, int(attr(ret, "status")))
 		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
 
+		shinyjs::enable("buttonDownload")
 		}) # isolate()
 	})
 
 	output$infoText <- renderText({
 		return(reactives$console)
+	})
+	
+	output$buttonDownload <- downloadHandler(
+		filename = "ebook.pdf",
+		content = function(file) {
+			file.copy(reactives$pdfpath, file)
+		},
+		contentType = 'application/pdf'
+	)
+	
+	output$preview <- renderText({
+		# TODO: Pdf preview here
 	})
 
 }
