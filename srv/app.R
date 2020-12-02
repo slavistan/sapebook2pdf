@@ -72,6 +72,7 @@ server <- function(input, output, session) {
 		##
 		## Check inputs
 		##
+		printf("Checking inputs ...\n")
 		if (is.null(input$pgnum) ||
 			is.null(input$baseUrl) ||
 			is.null(input$cookiesFile)) {
@@ -84,6 +85,7 @@ server <- function(input, output, session) {
 		##
 		## Check connection
 		##
+		printf("Checking connection ...\n")
 		ret <- system2("sapebook2pdf",
 				args=c("@", "checkconn", input$cookiesFile$datapath, input$baseUrl),
 				stdout=T, stderr=T)
@@ -97,6 +99,7 @@ server <- function(input, output, session) {
 		##
 		## Download SVGs
 		##
+		printf("Downloading SVGs ...\n")
 		reactives$tmpdir <- tempdir()
 		pages <- paste(seq(1, input$pgnum), collapse=",")
 
@@ -109,6 +112,7 @@ server <- function(input, output, session) {
 		##
 		## Check fonts
 		##
+		printf("Checking fonts ...\n")
 		ret <- system2("sapebook2pdf",
 				args=c("@", "checkfonts", reactives$tmpdir),
 				stdout=T, stderr=T)
@@ -118,6 +122,7 @@ server <- function(input, output, session) {
 		##
 		## Generate PDF pages
 		##
+		printf("Generate PDF pages ...\n")
 		ret <- system2("sapebook2pdf",
 				args=c("@", "genpdfs", reactives$tmpdir, reactives$tmpdir),
 				stdout=T, stderr=T)
@@ -127,6 +132,7 @@ server <- function(input, output, session) {
 		##
 		## Collate PDF pages
 		##
+		printf("Collate PDF pages ...\n")
 		reactives$pdfpath <- paste0(reactives$tmpdir, "/ebook.pdf")
 		ret <- system2("sapebook2pdf",
 				args=c("@", "collatepdfs", reactives$tmpdir, reactives$pdfpath),
