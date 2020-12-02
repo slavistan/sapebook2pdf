@@ -256,16 +256,24 @@ genpdfs() {
 		return 1
 	fi
 
+	# HACK: We use inkscape for the conversion between SVGs and PDFs.
+	#       For unknown reasons 'rsvg-convert', which was used prior to that,
+	#       began to distort the images embedded in the SVGs.  inkscape is
+	#       terminally stupid and cannot execute cli commands without an X
+	#       server. We use Xvfb to entertain inkscape. Note that we cannot shut
+	#       down Xvfb safely as multiple instances of this script may be
+	#       running concurrently. Come back once that's fixed in inkscape.
+	if [ -z "$DISPLAY" ]; then
+		DISPLAY=:1
+		Xvfb $DISPLAY &
+	fi
+
 	ii=0
 	goterr=0
 	while read svgfile; do
 		pdffile="$pdfdir/$(basename -s '.svg' "$svgfile").pdf"
 		ii=$((ii + 1))
 
-		# NOTE: We use inkscape for the conversion between SVGs and PDFs.
-		#       For unknown reasons 'rsvg-convert', which was used prior to
-		#       that, began to distort the images embedded in the SVGs.
-		#       Also, see the HACK note below.
 		if ! cat "$svgfile" | inkscape --pipe --export-filename="$pdffile" 2>/dev/null; then
 			printf " - [✗] Converting SVG %d/%d ... fail.\n" "$ii" "$numsvgs"
 			goterr=1
@@ -334,15 +342,6 @@ case "$1" in
 	"$@"
 	;;
 *)
-	# HACK: inkscape is terminally stupid and cannot execute cli commands
-	#       without an X server. We use Xvfb to entertain inkscape. Note that
-	#       we cannot shut down Xvfb safely as multiple instances of this may
-	#       be running concurrently. Come back once that's fixed in inkscape.
-	if [ -z "$DISPLAY" ]; then
-		DISPLAY=:1
-		Xvfb $DISPLAY &
-	fi
-
 	cookies="$1"
 	baseurl="$2"
 	svgdir="$3"

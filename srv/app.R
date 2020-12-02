@@ -123,7 +123,6 @@ server <- function(input, output, session) {
 				stdout=T, stderr=T)
 		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
 		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
-		reactives$pdfpage1 <- paste(reactives$tmpdir, "/page1.pdf")
 
 		##
 		## Collate PDF pages
