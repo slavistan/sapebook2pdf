@@ -61,13 +61,9 @@ ui <- fluidPage(
 server <- function(input, output) {
 	# Reactive: Aggregated console output
 	reactives <- reactiveValues(console="", pdfpath="")
+	shinyjs::disable("buttonDownload")
 
-	observe({
-		input$buttonGo
-
-		shinyjs::disable("buttonDownload")
-
-		isolate({
+	observeEvent(input$buttonGo, {
 
 		##
 		## Check inputs
@@ -99,15 +95,17 @@ server <- function(input, output) {
 		##
 		## Download SVGs
 		##
-		reactives$tmpdir <- tempdir()
-		printf("Downloading SVGs ... tmpdir = '%s'\n", reactives$tmpdir)
-		pages <- paste(seq(1, input$pgnum), collapse=",")
+		withProgress(message='Download SVGs', value=0, {
+			reactives$tmpdir <- tempdir()
+			printf("Downloading SVGs ... tmpdir = '%s'\n", reactives$tmpdir)
+			pages <- paste(seq(1, input$pgnum), collapse=",")
 
-		ret <- system2("sapebook2pdf",
-				args=c("@", "dlsvgs", input$cookiesFile$datapath, input$baseUrl, reactives$tmpdir, pages),
-				stdout=T, stderr=T)
-		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
-		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+			ret <- system2("sapebook2pdf",
+					args=c("@", "dlsvgs", input$cookiesFile$datapath, input$baseUrl, reactives$tmpdir, pages),
+					stdout=T, stderr=T)
+			retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
+			reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+		})
 
 		##
 		## Check fonts
@@ -122,26 +120,27 @@ server <- function(input, output) {
 		##
 		## Generate PDF pages
 		##
-		printf("Generating PDF pages ...\n")
-		ret <- system2("sapebook2pdf",
-				args=c("@", "genpdfs", reactives$tmpdir, reactives$tmpdir),
-				stdout=T, stderr=T)
-		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
-		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+		withProgress(message='Download SVGs', value=0, {
+			printf("Generating PDF pages ...\n")
+			ret <- system2("sapebook2pdf",
+					args=c("@", "genpdfs", reactives$tmpdir, reactives$tmpdir),
+					stdout=T, stderr=T)
+			retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
+			reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+		})
 
-		##
-		## Collate PDF pages
-		##
-		printf("Collating PDF pages ...\n")
-		reactives$pdfpath <- paste0(reactives$tmpdir, "/ebook.pdf")
-		ret <- system2("sapebook2pdf",
-				args=c("@", "collatepdfs", reactives$tmpdir, reactives$pdfpath),
-				stdout=T, stderr=T)
-		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
-		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+			##
+			## Collate PDF pages
+			##
+			printf("Collating PDF pages ...\n")
+			reactives$pdfpath <- paste0(reactives$tmpdir, "/ebook.pdf")
+			ret <- system2("sapebook2pdf",
+					args=c("@", "collatepdfs", reactives$tmpdir, reactives$pdfpath),
+					stdout=T, stderr=T)
+			retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
+			reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
 
 		shinyjs::enable("buttonDownload")
-		}) # isolate()
 	})
 
 	output$infoText <- renderText({
