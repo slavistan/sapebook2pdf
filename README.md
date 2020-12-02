@@ -7,6 +7,5 @@ For usage instructions see `sapebook2pdf --help`.
 ### Dependencies (sufficient)
 
  + GNU/Linux
- + `Xvfb`
- + `inkscape` ≥ v1.0.1
+ + `inkscape` < v1.0
  + `pdftk` ≥ v3.0.9
