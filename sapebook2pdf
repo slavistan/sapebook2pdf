@@ -97,10 +97,7 @@ dlsvgs() {
 	for pgnum in $(echo "$pages" | tr ',' ' '); do
 		ii=$((ii + 1))
 		if ! _dlsvg "$cookies" "$baseurl" "$outdir" "$pgnum"; then
-			printf " - [✗] Downloading SVG %d/%d ... fail.\n" "$ii" "$numpgs"
 			goterr=1
-		else
-			printf " - [✔] Downloading SVG %d/%d ... success.\n" "$ii" "$numpgs"
 		fi
 	done
 
@@ -123,8 +120,10 @@ _dlsvg() {
 	svg="$(echo "$reply" | head -n -1)"
 
 	if [ -z "$svg" ] || [ ! "$retcode" -eq 200 ]; then
+		printf " - [✗] Downloading SVG page %d ... fail.\n" "$pgnum"
 		return 1
 	else
+		printf " - [✔] Downloading SVG page %d ... success.\n" "$pgnum"
 		echo "$svg" > "$svgpath"
 	fi
 }
@@ -262,17 +261,30 @@ genpdfs() {
 		pdffile="$pdfdir/$(basename -s '.svg' "$svgfile").pdf"
 		ii=$((ii + 1))
 
-		if ! inkscape "$svgfile" --export-pdf="$pdffile" 2>/dev/null; then
-			printf " - [✗] Converting SVG %d/%d ... fail.\n" "$ii" "$numsvgs"
+		if ! _genpdf "$svgdir" "$pdfdir" "$ii"; then
 			goterr=1
-		else
-			printf " - [✔] Converting SVG %d/%d ... success.\n" "$ii" "$numsvgs"
 		fi
 	done <<-EOF
 	$svgs
 	EOF
 
 	return "$goterr"
+}
+
+_genpdf() {
+	# Unsafe - no checking
+
+	svgdir="$1" # input directory containing page%d.svg files
+	pdfdir="$2" # output directory for page%d.pdf files
+	pgnum="$3"
+
+	svgfile="$svgdir/page$pgnum.svg"
+	pdffile="$pdfdir/page$pgnum.pdf"
+	if ! inkscape "$svgfile" --export-pdf="$pdffile" 2>/dev/null; then
+		printf " - [✗] Generating SVG page %d ... fail.\n" "$pgnum"
+	else
+		printf " - [✔] Converting SVG page %d ... success.\n" "$pgnum"
+	fi
 }
 
 collatepdfs() {

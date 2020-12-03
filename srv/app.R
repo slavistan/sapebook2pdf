@@ -98,13 +98,17 @@ server <- function(input, output) {
 		withProgress(message='Download SVGs', value=0, {
 			reactives$tmpdir <- tempdir()
 			printf("Downloading SVGs ... tmpdir = '%s'\n", reactives$tmpdir)
-			pages <- paste(seq(1, input$pgnum), collapse=",")
 
-			ret <- system2("sapebook2pdf",
-					args=c("@", "dlsvgs", input$cookiesFile$datapath, input$baseUrl, reactives$tmpdir, pages),
-					stdout=T, stderr=T)
-			retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
-			reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+			pages <- seq(1, input$pgnum)
+			incr <- 1/input$pgnum
+			for (pgnum in pages) {
+				ret <- system2("sapebook2pdf",
+						args=c("@", "_dlsvg", input$cookiesFile$datapath, input$baseUrl, reactives$tmpdir, pgnum),
+						stdout=T, stderr=T)
+				retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
+				reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+				incProgress(incr, detail=paste0("Page ", pgnum, "/", input$pgnum))
+			}
 		})
 
 		##
@@ -120,13 +124,19 @@ server <- function(input, output) {
 		##
 		## Generate PDF pages
 		##
-		withProgress(message='Download SVGs', value=0, {
+		withProgress(message='Generate PDFs', value=0, {
 			printf("Generating PDF pages ...\n")
-			ret <- system2("sapebook2pdf",
-					args=c("@", "genpdfs", reactives$tmpdir, reactives$tmpdir),
-					stdout=T, stderr=T)
-			retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
-			reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+
+			pages <- seq(1, input$pgnum)
+			incr <- 1/input$pgnum
+			for (pgnum in pages) {
+				ret <- system2("sapebook2pdf",
+						args=c("@", "_genpdf", reactives$tmpdir, reactives$tmpdir, pgnum),
+						stdout=T, stderr=T)
+				retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
+				reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+				incProgress(incr, detail=paste0("Page ", pgnum, "/", input$pgnum))
+			}
 		})
 
 			##
