@@ -342,6 +342,7 @@ case "$1" in
 	"$@"
 	;;
 *)
+	[ $# -lt 6 ] && { echo "Invalid arguments. See $0 --help."; exit 1; }
 	cookies="$1"
 	baseurl="$2"
 	svgdir="$3"

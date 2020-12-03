@@ -64,6 +64,7 @@ server <- function(input, output) {
 	shinyjs::disable("buttonDownload")
 
 	observeEvent(input$buttonGo, {
+		shinyjs::disable("buttonGo")
 
 		##
 		## Check inputs
@@ -74,6 +75,7 @@ server <- function(input, output) {
 			is.null(input$cookiesFile)) {
 
 			reactives$console <- "Missing inputs."
+			shinyjs::enable("buttonGo")
 			return()
 		}
 		reactives$console <- ""
@@ -89,6 +91,7 @@ server <- function(input, output) {
 		# ^--- this is exactly why using R for anything outside of statistics is bullshit
 		reactives$console <- paste(ret, collapse="\n")
 		if (retcode != 0) {
+			shinyjs::enable("buttonGo")
 			return()
 		}
 
@@ -127,7 +130,6 @@ server <- function(input, output) {
 		withProgress(message='Generate PDFs', value=0, {
 			printf("Generating PDF pages ...\n")
 
-			pages <- seq(1, input$pgnum)
 			incr <- 1/input$pgnum
 			for (pgnum in pages) {
 				ret <- system2("sapebook2pdf",
@@ -139,6 +141,7 @@ server <- function(input, output) {
 			}
 		})
 
+		withProgress(message='Collate PDFs', value=0.01, {
 			##
 			## Collate PDF pages
 			##
@@ -149,8 +152,10 @@ server <- function(input, output) {
 					stdout=T, stderr=T)
 			retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
 			reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+		})
 
 		shinyjs::enable("buttonDownload")
+		shinyjs::enable("buttonGo")
 	})
 
 	output$infoText <- renderText({
