@@ -13,7 +13,7 @@ ui <- fluidPage(
 	)),
 
 	# App title ----
-	titlePanel("Hello Shiny!"),
+	titlePanel("Generate PDFs from SAP Learning Hub Ebooks"),
 
 	# Sidebar layout with input and output definitions ----
 	sidebarLayout(
@@ -50,9 +50,7 @@ ui <- fluidPage(
 		# Main panel for displaying outputs ----
 		mainPanel(
 
-			# Output: PDF preview
-			htmlOutput('preview')
-
+			imageOutput("pdfPreview")
 		)
 	)
 )
@@ -60,11 +58,15 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram ----
 server <- function(input, output) {
 	# Reactive: Aggregated console output
-	reactives <- reactiveValues(console="", pdfpath="")
+	reactives <- reactiveValues(console="", pdfpath="", page1.svg="")
 	shinyjs::disable("buttonDownload")
 
 	observeEvent(input$buttonGo, {
 		shinyjs::disable("buttonGo")
+		shinyjs::disable("buttonDownload")
+		reactives$console <- ""
+		reactives$page1.svg <- ""
+
 
 		##
 		## Check inputs
@@ -109,10 +111,11 @@ server <- function(input, output) {
 						args=c("@", "_dlsvg", input$cookiesFile$datapath, input$baseUrl, reactives$tmpdir, pgnum),
 						stdout=T, stderr=T)
 				retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
-				reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+				reactives$console <- paste0(reactives$console, "\n", paste0(ret, collapse="\n"))
 				incProgress(incr, detail=paste0("Page ", pgnum, "/", input$pgnum))
 			}
 		})
+		reactives$page1.svg <- paste0(reactives$tmpdir, "/page1.svg")
 
 		##
 		## Check fonts
@@ -122,7 +125,7 @@ server <- function(input, output) {
 				args=c("@", "checkfonts", reactives$tmpdir),
 				stdout=T, stderr=T)
 		retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
-		reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+		reactives$console <- paste0(reactives$console, "\n", paste0(ret, collapse="\n"))
 
 		##
 		## Generate PDF pages
@@ -136,7 +139,7 @@ server <- function(input, output) {
 						args=c("@", "_genpdf", reactives$tmpdir, reactives$tmpdir, pgnum),
 						stdout=T, stderr=T)
 				retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
-				reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+				reactives$console <- paste0(reactives$console, "\n", paste0(ret, collapse="\n"))
 				incProgress(incr, detail=paste0("Page ", pgnum, "/", input$pgnum))
 			}
 		})
@@ -151,7 +154,7 @@ server <- function(input, output) {
 					args=c("@", "collatepdfs", reactives$tmpdir, reactives$pdfpath),
 					stdout=T, stderr=T)
 			retcode <- ifelse(toString(attr(ret, "status")) == "", 0, as.integer(attr(ret, "status")))
-			reactives$console <- paste(reactives$console, "\n", paste(ret, collapse="\n"))
+			reactives$console <- paste0(reactives$console, "\n", paste(ret, collapse="\n"))
 		})
 
 		shinyjs::enable("buttonDownload")
@@ -161,6 +164,12 @@ server <- function(input, output) {
 	output$infoText <- renderText({
 		return(reactives$console)
 	})
+
+	output$pdfPreview <- renderImage({
+		if (!is.null(reactives$page1.svg)) {
+			list(src=reactives$page1.svg, contentType="image/svg+xml")
+		}
+	}, deleteFile=F)
 	
 	output$buttonDownload <- downloadHandler(
 		filename = "ebook.pdf",
@@ -169,10 +178,6 @@ server <- function(input, output) {
 		},
 		contentType = 'application/pdf'
 	)
-	
-	output$preview <- renderText({
-		# TODO: Pdf preview here
-	})
 
 }
 
@@ -181,5 +186,3 @@ app <- shinyApp(ui=ui, server=server, options=list(autoreload=T))
 port <- as.integer(Sys.getenv("PORT", unset=5000))
 host <- "0.0.0.0"
 runApp(app, port=port, host=host)
-
-# TODO: Document shiny app

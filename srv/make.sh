@@ -41,7 +41,7 @@ trap _cleanup INT
 
 export PORT=5000
 case "$1" in
-watch)
+watch) # Hot reload during rev
 	_start surf shiny
 	entr -pc "$0" _reload <<-EOF
 	app.R
@@ -52,7 +52,6 @@ start)
 	Rscript app.R
 	;;
 _reload)
-	# Inkscape HACK. See sapebook2pdf.
 	_reload surf shiny
 	;;
 @)
@@ -60,6 +59,6 @@ _reload)
 	"$@"
 	;;
 *)
-	echo "Shiny server hot reload. Usage: $0 watch"
+	echo "Shiny server. Usage: $0 start"
 	;;
 esac
